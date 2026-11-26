@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=5">
+  <link rel="stylesheet" href="styles.css?v=6">
 
   <!-- MediaPipe Pose CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
@@ -48,8 +48,12 @@
         <button id="btn-fullscreen" class="hud-btn" type="button" title="Tam Ekran">⛶</button>
         <button id="btn-hud-settings" class="hud-btn" type="button" title="Ayarlar">⚙</button>
         <button id="btn-pause" class="hud-btn" type="button" title="Duraklat">⏸</button>
+        <button id="btn-hide-hud" class="hud-btn" type="button" title="Üst Çubuğu Gizle">✕</button>
       </div>
     </header>
+
+    <!-- Üst çubuk gizliyken geri getirmek için köşede silik küçük simge -->
+    <button id="btn-show-hud" class="hud-restore-btn hidden" type="button" title="Üst Çubuğu Göster">☰</button>
 
     <!-- İsteğe bağlı oyun içi küçük kamera köşesi (varsayılan kapalı, 📷 ile açılır) -->
     <div id="pip-camera-slot" class="pip-slot hidden"></div>
@@ -244,6 +248,6 @@
     </div>
   </section>
 
-  <script type="module" src="app.js?v=5"></script>
+  <script type="module" src="app.js?v=6"></script>
 </body>
 </html>

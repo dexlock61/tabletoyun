@@ -194,6 +194,30 @@ body {
   color: #faf7f0;
 }
 
+/* Üst çubuk gizliyken sadece sağ üst köşede küçük silik geri getirme simgesi */
+.hud-restore-btn {
+  position: fixed;
+  top: max(10px, env(safe-area-inset-top));
+  right: max(10px, env(safe-area-inset-right));
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(217, 207, 192, 0.7);
+  background: rgba(250, 247, 240, 0.45);
+  color: rgba(61, 55, 48, 0.72);
+  font-size: 1rem;
+  font-weight: 800;
+  z-index: 12;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hud-restore-btn:active {
+  background: rgba(250, 247, 240, 0.9);
+}
+
 /* Oyun içi opsiyonel küçük kamera köşesi */
 .pip-slot {
   position: fixed;

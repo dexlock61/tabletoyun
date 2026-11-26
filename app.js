@@ -43,6 +43,8 @@ class ParkourApp {
     this.btnFullscreen = document.getElementById('btn-fullscreen');
     this.btnHudSettings = document.getElementById('btn-hud-settings');
     this.btnPause = document.getElementById('btn-pause');
+    this.btnHideHud = document.getElementById('btn-hide-hud');
+    this.btnShowHud = document.getElementById('btn-show-hud');
 
     this.btnCloseSettings = document.getElementById('btn-close-settings');
     this.btnSwitchCam = document.getElementById('btn-switch-cam');
@@ -67,7 +69,9 @@ class ParkourApp {
 
     this.state = 'welcome'; // welcome | playing | paused | complete | end
     this.settingsReturnState = 'welcome';
-    this.showPipInGame = false; // Varsayılan kapalı: oyun ekranı tertemiz 100% tam ekran!
+    this.showPipInGame = false;
+    this.hudHiddenByUser = false;
+    this.isInPrepPhase = false;
     this.lastTime = performance.now();
     this.isMuted = false;
     this.musicEnabled = true;
@@ -77,7 +81,9 @@ class ParkourApp {
     this.engine = new ParkourEngine(this.canvas, {
       onHudUpdate: (hud) => this.renderHud(hud),
       onStageComplete: (info) => this.handleStageComplete(info),
-      onGentleEnd: (info) => this.handleGentleEnd(info)
+      onGentleEnd: (info) => this.handleGentleEnd(info),
+      onAutoRecalibrate: () => this.tracker.recalibrate(),
+      onPrepStateChange: (inPrep) => this.handlePrepStateChange(inPrep)
     });
 
     if (this.tabletSpeedToggle) {
@@ -102,7 +108,7 @@ class ParkourApp {
       this.welcomeCameraSlot.appendChild(this.cameraBox);
     } else if (target === 'settings') {
       this.settingsCameraSlot.appendChild(this.cameraBox);
-    } else if (target === 'pip' && this.showPipInGame) {
+    } else if (target === 'pip' && (this.showPipInGame || this.isInPrepPhase)) {
       this.pipCameraSlot.classList.remove('hidden');
       this.pipCameraSlot.appendChild(this.cameraBox);
     } else {
@@ -164,6 +170,16 @@ class ParkourApp {
         this.engine.stop();
         this.setState('paused');
       }
+    });
+
+    this.btnHideHud.addEventListener('click', () => {
+      this.hudHiddenByUser = true;
+      this.updateHudVisibility();
+    });
+
+    this.btnShowHud.addEventListener('click', () => {
+      this.hudHiddenByUser = false;
+      this.updateHudVisibility();
     });
 
     this.btnResume.addEventListener('click', () => this.resumePlaying());
@@ -329,9 +345,41 @@ class ParkourApp {
     }
   }
 
+  handlePrepStateChange(inPrep) {
+    this.isInPrepPhase = !!inPrep;
+    if (this.state === 'playing' && this.screenSettings.classList.contains('hidden')) {
+      // 5 sn hazırlık sürecinde çocuk kendini görsün diye küçük kamerayı göster;
+      // koşu başlayınca oyun içi önizleme kapalıysa otomatik gizle!
+      if (this.isInPrepPhase || this.showPipInGame) {
+        this.pipCameraSlot.classList.remove('hidden');
+        this.pipCameraSlot.appendChild(this.cameraBox);
+        const vid = this.tracker.videoElement;
+        if (vid && vid.srcObject && vid.paused) vid.play().catch(() => {});
+      } else {
+        this.mountCamera('hidden');
+      }
+    }
+  }
+
+  updateHudVisibility() {
+    const playing = this.state === 'playing';
+    this.gameHud.classList.toggle('hidden', !playing || this.hudHiddenByUser);
+    this.btnShowHud.classList.toggle('hidden', !playing || !this.hudHiddenByUser);
+  }
+
   resizeCanvas() {
-    this.canvas.width = window.innerWidth;
-    this.canvas.height = window.innerHeight;
+    // Gerçek Retina / HiDPI HD çözünürlük (telefon/tabletlerde bulanık 480p görünümünü tamamen giderir!)
+    const cssW = window.innerWidth;
+    const cssH = window.innerHeight;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+
+    this.canvas.width = Math.round(cssW * dpr);
+    this.canvas.height = Math.round(cssH * dpr);
+
+    const ctx = this.canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    this.engine.setViewport(cssW, cssH);
   }
 
   setState(newState) {
@@ -342,14 +390,13 @@ class ParkourApp {
     this.screenComplete.classList.toggle('hidden', newState !== 'complete');
     this.screenEnd.classList.toggle('hidden', newState !== 'end');
 
-    // Oyun içi üst bar sadece oynarken görünsün
-    this.gameHud.classList.toggle('hidden', newState !== 'playing');
+    this.updateHudVisibility();
 
     if (newState === 'welcome') {
       this.screenWelcome.scrollTop = 0;
       this.mountCamera('welcome');
     } else if (newState === 'playing') {
-      this.mountCamera(this.showPipInGame ? 'pip' : 'hidden');
+      this.mountCamera(this.showPipInGame || this.isInPrepPhase ? 'pip' : 'hidden');
     } else {
       this.mountCamera('hidden');
     }

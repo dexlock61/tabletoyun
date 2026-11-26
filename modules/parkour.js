@@ -1,12 +1,10 @@
 /**
  * parkour.js
- * Birinci Şahıs (POV) Canlı Macera Parkuru Motoru.
- * Parlamayan, göz yormayan ama heyecanlı ve tempolu masal doğa parkuru:
- * - 3 şeritli sağa/sola kaçınma ve slalom geçişleri
- * - Zıplama kütükleri, parkur çubukları ve dere atlayışları
- * - Bayraklı ve yapraklı eğilme kemerleri
- * - Ayna Kapısı (Mirror Me) — eşleşince kapılar iki yana açılır ve hız desteği verir!
- * - Yol boyunca toplanabilir dönen altın yıldızlar, seri (kombo) sistemi ve 3-2-1 başlangıç!
+ * Birinci Şahıs (POV) HD Macera Parkuru Motoru.
+ * - Retina / HiDPI keskin vektör çizimi (devicePixelRatio uyumlu)
+ * - Zemin gölgeleri, derinlik sisi, katmanlı dağlar, dokulu ahşap engeller ve çim detayları
+ * - Bölüm başı 5 saniyelik etkileşimli "Hazırlan!" süreci ve otomatik boy kalibrasyonu
+ * - 3 şerit kaçınma, zıplama, eğilme, toplanabilir yıldızlar ve 11 tam vücut Ayna Kapısı
  */
 
 import { sfx } from './sound.js';
@@ -15,13 +13,17 @@ import { MIRROR_POSES, drawTargetPoseSilhouette, drawLiveMirrorOverlay } from '.
 
 const LANE_WIDTH = 2.05;
 const ROAD_HALF_WIDTH = LANE_WIDTH * 1.55;
-const VIEW_DISTANCE = 50;
+const VIEW_DISTANCE = 54;
 
 export class ParkourEngine {
   constructor(canvas, callbacks = {}) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.callbacks = callbacks;
+
+    // Mantıksal CSS boyutları (HiDPI ölçeklemesi app.js üzerinden setTransform ile yapılır)
+    this.viewWidth = window.innerWidth;
+    this.viewHeight = window.innerHeight;
 
     this.stage = 1;
     this.stars = 0;
@@ -33,10 +35,10 @@ export class ParkourEngine {
     this.speedMultiplier = 1.0;
 
     // POV Kamera ve Oyuncu Durumu
-    this.playerLane = 0; // -1: Sol, 0: Orta, 1: Sağ
+    this.playerLane = 0;
     this.cameraX = 0;
     this.cameraY = 1.55;
-    this.cameraRoll = 0; // Şerit değiştirirken hafif eğlenceli yatış açısı
+    this.cameraRoll = 0;
 
     // Zıplama ve Eğilme fiziği
     this.jumpTimer = 0;
@@ -47,19 +49,21 @@ export class ParkourEngine {
     this.crouchGraceTimer = 0;
     this.wasCrouchInput = false;
 
-    // Hız desteği (Ayna Kapısı veya yüksek seri sonrası kısa neşeli rüzgar)
     this.boostTimer = 0;
 
-    // 3-2-1 Başlangıç geri sayımı
+    // 5 saniyelik bölüm başı hazırlık süreci
+    this.prepDuration = 5.0;
     this.countdownTimer = 0;
     this.lastCountdownNum = 0;
+    this.recalibratedForStage = false;
 
-    // İlerleme ve nesneler
+    // İlerleme ve sahne nesneleri
     this.distance = 0;
     this.stageLength = 100;
     this.obstacles = [];
     this.collectibles = [];
     this.scenery = [];
+    this.roadPebbles = [];
     this.clouds = [];
     this.butterflies = [];
     this.particles = [];
@@ -67,7 +71,6 @@ export class ParkourEngine {
     this.clearedCount = 0;
     this.totalObstacles = 12;
 
-    // Geri bildirim mesajı
     this.feedbackText = '';
     this.feedbackColor = '#46733f';
     this.feedbackTimer = 0;
@@ -88,35 +91,53 @@ export class ParkourEngine {
     this.initScenery();
   }
 
+  setViewport(w, h) {
+    this.viewWidth = Math.max(1, w);
+    this.viewHeight = Math.max(1, h);
+  }
+
   initAtmosphere() {
     this.clouds = [
-      { x: 0.14, y: 0.13, scale: 1.05, speed: 0.005 },
-      { x: 0.48, y: 0.09, scale: 0.9, speed: 0.0038 },
-      { x: 0.8, y: 0.15, scale: 1.12, speed: 0.0044 }
+      { x: 0.14, y: 0.12, scale: 1.05, speed: 0.0045 },
+      { x: 0.48, y: 0.085, scale: 0.9, speed: 0.0034 },
+      { x: 0.8, y: 0.14, scale: 1.15, speed: 0.004 }
     ];
     this.butterflies = [
-      { x: 0.25, y: 0.34, phase: 0, speed: 0.035, color: '#e6a65c' },
-      { x: 0.72, y: 0.31, phase: 2.1, speed: -0.03, color: '#d97b66' }
+      { x: 0.25, y: 0.34, phase: 0, speed: 0.032, color: '#e6a65c' },
+      { x: 0.72, y: 0.3, phase: 2.1, speed: -0.028, color: '#df7f62' }
     ];
   }
 
   initScenery() {
     this.scenery = [];
-    for (let z = 3; z <= VIEW_DISTANCE; z += 3.8) {
+    for (let z = 3; z <= VIEW_DISTANCE; z += 3.4) {
       this.scenery.push(this.createSceneryItem(-1, z + Math.random() * 1.4));
       this.scenery.push(this.createSceneryItem(1, z + Math.random() * 1.4));
+    }
+
+    this.roadPebbles = [];
+    for (let i = 0; i < 28; i++) {
+      this.roadPebbles.push({
+        x: (Math.random() - 0.5) * ROAD_HALF_WIDTH * 1.85,
+        z: 1.5 + Math.random() * (VIEW_DISTANCE - 4),
+        r: 0.05 + Math.random() * 0.07,
+        shade: Math.random() < 0.5 ? '#c7b08e' : '#b79e7a'
+      });
     }
   }
 
   createSceneryItem(side, z) {
-    const types = ['pine', 'roundTree', 'flagPost', 'flowerBush', 'pine', 'roundTree'];
+    const types = ['pine', 'roundTree', 'flagPost', 'flowerBush', 'grassTuft', 'pine', 'roundTree'];
     const type = types[Math.floor(Math.random() * types.length)];
     const isFlag = type === 'flagPost';
+    const isTuft = type === 'grassTuft';
     return {
       side,
       x: isFlag
         ? side * (ROAD_HALF_WIDTH + 0.55)
-        : side * (ROAD_HALF_WIDTH + 1.4 + Math.random() * 4.4),
+        : isTuft
+          ? side * (ROAD_HALF_WIDTH + 0.35 + Math.random() * 1.1)
+          : side * (ROAD_HALF_WIDTH + 1.5 + Math.random() * 4.8),
       z,
       type,
       scale: 0.85 + Math.random() * 0.45,
@@ -142,24 +163,27 @@ export class ParkourEngine {
     this.crouchGraceTimer = 0;
     this.boostTimer = 0;
 
-    // 3-2-1 Canlı başlangıç!
-    this.countdownTimer = 2.4;
-    this.lastCountdownNum = 4;
+    // 5 saniyelik rahat hazırlık süresi
+    this.countdownTimer = this.prepDuration;
+    this.lastCountdownNum = 6;
+    this.recalibratedForStage = false;
 
     this.generateStageCourse(stageNum);
     this.isRunning = true;
+    if (this.callbacks.onPrepStateChange) {
+      this.callbacks.onPrepStateChange(true);
+    }
     this.notifyHud();
   }
 
   stop() {
     this.isRunning = false;
     sfx.stopMusic();
+    if (this.callbacks.onPrepStateChange) {
+      this.callbacks.onPrepStateChange(false);
+    }
   }
 
-  /**
-   * Tempolu, ritmik ve eğlenceli parkur oluşturur.
-   * Engellerin arasına toplanacak altın yıldız dizileri ekler!
-   */
   generateStageCourse(stageNum) {
     this.obstacles = [];
     this.collectibles = [];
@@ -179,7 +203,6 @@ export class ParkourEngine {
       if (i < 4) {
         type = patternPool[i];
       } else {
-        // Dodge ve Jump biraz daha sık, Mirror Me her 3-4 engelde bir sürpriz!
         const weighted = ['dodge', 'jump', 'duck', 'dodge', 'mirror'];
         const candidates = weighted.filter((t) => t !== lastType);
         type = candidates[Math.floor(Math.random() * candidates.length)];
@@ -209,7 +232,6 @@ export class ParkourEngine {
           hit: false
         });
 
-        // Açık şeridin hemen önüne ve arkasına 2 davetkâr yıldız koy!
         this.collectibles.push({ lane: openLane, y: 0.95, z: nextZ - 4.2, collected: false });
         this.collectibles.push({ lane: openLane, y: 0.95, z: nextZ + 3.5, collected: false });
       } else if (type === 'jump') {
@@ -223,7 +245,6 @@ export class ParkourEngine {
           hit: false
         });
 
-        // Zıplama engelinin tam üstünde havada ödül yıldızı!
         this.collectibles.push({ lane: lastOpenLane, y: 2.05, z: nextZ, collected: false, high: true });
       } else if (type === 'duck') {
         const style = Math.random() < 0.5 ? 'bunting' : 'branch';
@@ -235,7 +256,6 @@ export class ParkourEngine {
           hit: false
         });
 
-        // Eğilme kemerinin altında alçak ödül yıldızı!
         this.collectibles.push({ lane: lastOpenLane, y: 0.55, z: nextZ, collected: false, low: true });
       } else if (type === 'mirror') {
         const poseDef = this.drawNextMirrorPose();
@@ -256,7 +276,6 @@ export class ParkourEngine {
       nextZ += baseGap;
     }
 
-    // Bitiş öncesi 3'lü kutlama yıldızı!
     for (let s = 0; s < 3; s++) {
       this.collectibles.push({ lane: 0, y: 0.95, z: nextZ + s * 2.4, collected: false });
     }
@@ -271,7 +290,6 @@ export class ParkourEngine {
 
   drawNextMirrorPose() {
     if (!this.poseDeck || this.poseDeck.length === 0) {
-      // Tüm pozları karıştır (bacaklı ve kollu pozlar dengeli dağılsın)
       this.poseDeck = [...MIRROR_POSES];
       for (let i = this.poseDeck.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -307,14 +325,6 @@ export class ParkourEngine {
     if (bodyScale) this.liveBodyScale = bodyScale;
   }
 
-  triggerMatchCurrentMirrorPose() {
-    const upcoming = this.obstacles.find((o) => o.type === 'mirror' && !o.matched && o.z - this.distance > 0.5 && o.z - this.distance < 24);
-    if (upcoming) {
-      this.manualPoseId = upcoming.poseDef.id;
-      this.manualPoseTimer = 1.1;
-    }
-  }
-
   triggerKeyboardJump() {
     if (this.jumpTimer <= 0) {
       this.jumpTimer = this.jumpDuration;
@@ -333,6 +343,14 @@ export class ParkourEngine {
     const p = MIRROR_POSES[poseIndex];
     if (p) {
       this.manualPoseId = p.id;
+      this.manualPoseTimer = 1.1;
+    }
+  }
+
+  triggerMatchCurrentMirrorPose() {
+    const upcoming = this.obstacles.find((o) => o.type === 'mirror' && !o.matched && o.z - this.distance > 0.5 && o.z - this.distance < 24);
+    if (upcoming) {
+      this.manualPoseId = upcoming.poseDef.id;
       this.manualPoseTimer = 1.1;
     }
   }
@@ -372,7 +390,6 @@ export class ParkourEngine {
   update(dt) {
     this.time += dt;
 
-    // Bulutlar ve kelebekler
     this.clouds.forEach((c) => {
       c.x += c.speed * dt;
       if (c.x > 1.18) c.x = -0.18;
@@ -385,7 +402,6 @@ export class ParkourEngine {
       if (b.x < -0.12) b.x = 1.12;
     });
 
-    // Parçacıklar
     for (let i = this.particles.length - 1; i >= 0; i--) {
       this.particles[i].update();
       if (this.particles[i].alpha <= 0) this.particles.splice(i, 1);
@@ -399,15 +415,13 @@ export class ParkourEngine {
       if (this.manualPoseTimer === 0) this.manualPoseId = null;
     }
 
-    // POV Kamera yatay hareket + hafif eğlenceli yatış (tilt)
     const targetCamX = this.playerLane * LANE_WIDTH;
     const prevCamX = this.cameraX;
     this.cameraX += (targetCamX - this.cameraX) * Math.min(1, dt * 10.5);
     const camVelX = (this.cameraX - prevCamX) / Math.max(0.001, dt);
-    const targetRoll = Math.max(-0.042, Math.min(0.042, -camVelX * 0.0055));
+    const targetRoll = Math.max(-0.04, Math.min(0.04, -camVelX * 0.0052));
     this.cameraRoll += (targetRoll - this.cameraRoll) * Math.min(1, dt * 9);
 
-    // Zıplama yüksekliği
     let jumpOffset = 0;
     if (this.jumpTimer > 0) {
       this.jumpTimer = Math.max(0, this.jumpTimer - dt);
@@ -415,7 +429,6 @@ export class ParkourEngine {
       jumpOffset = Math.sin(t * Math.PI) * 1.55;
     }
 
-    // Eğilme yumuşak geçişi
     if (this.crouchGraceTimer > 0) {
       this.crouchGraceTimer = Math.max(0, this.crouchGraceTimer - dt);
     }
@@ -423,31 +436,42 @@ export class ParkourEngine {
     this.crouchAmount += (targetCrouch - this.crouchAmount) * Math.min(1, dt * 11);
 
     const strideBob = this.isRunning && this.countdownTimer <= 0 && jumpOffset === 0 && this.crouchAmount < 0.3
-      ? Math.sin(this.distance * 1.65) * 0.055
+      ? Math.sin(this.distance * 1.65) * 0.052
       : 0;
 
     this.cameraY = 1.55 + jumpOffset - this.crouchAmount * 0.88 + strideBob;
 
     if (!this.isRunning) return;
 
-    // 3-2-1 Başlangıç geri sayımı
+    // 5 saniyelik bölüm başı hazırlık süreci
     if (this.countdownTimer > 0) {
       this.countdownTimer -= dt;
-      const curNum = Math.ceil(this.countdownTimer / 0.75);
-      if (curNum !== this.lastCountdownNum && curNum >= 1 && curNum <= 3) {
+      const curNum = Math.ceil(this.countdownTimer);
+      if (curNum !== this.lastCountdownNum && curNum >= 1 && curNum <= 5) {
         this.lastCountdownNum = curNum;
-        sfx.playCountdown(false);
+        if (curNum <= 3) sfx.playCountdown(false);
       }
+
+      // Son 0.5 saniyede oyuncu yerine geçtiği için boy kalibrasyonunu otomatik kilitle!
+      if (!this.recalibratedForStage && this.countdownTimer <= 0.5) {
+        this.recalibratedForStage = true;
+        if (this.callbacks.onAutoRecalibrate) {
+          this.callbacks.onAutoRecalibrate();
+        }
+      }
+
       if (this.countdownTimer <= 0) {
         this.countdownTimer = 0;
         sfx.playCountdown(true);
         sfx.startMusic();
+        if (this.callbacks.onPrepStateChange) {
+          this.callbacks.onPrepStateChange(false);
+        }
         this.showFeedback('Başladık! Koş!', '#46733f');
       }
       return;
     }
 
-    // Ayna Kapısı yaklaşırken poz kopyalamak için hafif yavaşlatma
     let mirrorSlowFactor = 1.0;
     for (const obs of this.obstacles) {
       if (obs.type === 'mirror' && !obs.matched) {
@@ -459,30 +483,36 @@ export class ParkourEngine {
       }
     }
 
-    // Seri & Hız desteği faktörü (heyecanlı ama kontrollü!)
     const streakBonus = 1.0 + Math.min(0.18, this.streak * 0.025);
     const boostFactor = this.boostTimer > 0 ? 1.22 : 1.0;
 
-    // Canlı, keyifli koşu hızı
     const baseSpeed = (9.6 + (this.stage - 1) * 0.8) * this.speedMultiplier * mirrorSlowFactor * streakBonus * boostFactor;
     const step = baseSpeed * dt;
     this.distance += step;
 
-    // Kenar dekorları kaydır
     for (const item of this.scenery) {
       item.z -= step;
       if (item.z < 1.1) {
         item.z += VIEW_DISTANCE;
         item.x = item.type === 'flagPost'
           ? item.side * (ROAD_HALF_WIDTH + 0.55)
-          : item.side * (ROAD_HALF_WIDTH + 1.4 + Math.random() * 4.4);
+          : item.type === 'grassTuft'
+            ? item.side * (ROAD_HALF_WIDTH + 0.35 + Math.random() * 1.1)
+            : item.side * (ROAD_HALF_WIDTH + 1.5 + Math.random() * 4.8);
+      }
+    }
+
+    for (const peb of this.roadPebbles) {
+      peb.z -= step;
+      if (peb.z < 0.8) {
+        peb.z += VIEW_DISTANCE - 3;
+        peb.x = (Math.random() - 0.5) * ROAD_HALF_WIDTH * 1.85;
       }
     }
 
     const isAirborne = jumpOffset > 0.3;
     const isDucked = this.crouchAmount > 0.4;
 
-    // Toplanabilir altın yıldız kontrolü
     for (const col of this.collectibles) {
       if (col.collected) continue;
       const relZ = col.z - this.distance;
@@ -494,17 +524,15 @@ export class ParkourEngine {
           this.stars += 1;
           sfx.playStar(this.streak);
           const proj = this.project(col.lane * LANE_WIDTH, col.y, Math.max(1.2, relZ));
-          this.spawnCelebration(proj.x, proj.y, 8);
+          this.spawnCelebration(proj.x, proj.y, 9);
           this.notifyHud();
         }
       }
     }
 
-    // Engeller ve Ayna Kapıları
     for (const obs of this.obstacles) {
       const relZ = obs.z - this.distance;
 
-      // Ayna Kapısı poz kontrolü
       if (obs.type === 'mirror' && !obs.matched && relZ < 22 && relZ > 0.6) {
         const poseMatched =
           (this.manualPoseId && this.manualPoseId === obs.poseDef.id) ||
@@ -523,7 +551,7 @@ export class ParkourEngine {
             this.boostTimer = 1.6;
             sfx.playPoseMatch();
             this.showFeedback(`Süper! +3 Yıldız — ${obs.poseDef.title}!`, '#46733f');
-            this.spawnCelebration(this.canvas.width * 0.5, this.canvas.height * 0.44, 22);
+            this.spawnCelebration(this.viewWidth * 0.5, this.viewHeight * 0.44, 22);
             this.notifyHud();
           }
         } else {
@@ -535,7 +563,6 @@ export class ParkourEngine {
         obs.curtainOpen = Math.min(1, obs.curtainOpen + dt * 3.5);
       }
 
-      // Engel geçiş kararı
       if (!obs.resolved && relZ <= 1.35) {
         obs.resolved = true;
 
@@ -543,7 +570,7 @@ export class ParkourEngine {
           this.isRunning = false;
           sfx.stopMusic();
           sfx.playStageComplete();
-          this.spawnCelebration(this.canvas.width * 0.5, this.canvas.height * 0.4, 30);
+          this.spawnCelebration(this.viewWidth * 0.5, this.viewHeight * 0.4, 30);
           this.notifyHud();
           if (this.callbacks.onStageComplete) {
             this.callbacks.onStageComplete({
@@ -585,7 +612,7 @@ export class ParkourEngine {
               msg = `${msg} (${this.streak}x Seri!)`;
             }
             this.showFeedback(msg, '#46733f');
-            this.spawnCelebration(this.canvas.width * 0.5, this.canvas.height * 0.5, 12);
+            this.spawnCelebration(this.viewWidth * 0.5, this.viewHeight * 0.5, 12);
           }
         } else {
           obs.hit = true;
@@ -629,11 +656,11 @@ export class ParkourEngine {
   }
 
   project(worldX, worldY, relZ) {
-    const w = this.canvas.width;
-    const h = this.canvas.height;
+    const w = this.viewWidth;
+    const h = this.viewHeight;
     const z = Math.max(0.25, relZ);
     const focal = Math.min(w, h) * 0.72;
-    const horizonY = h * 0.41;
+    const horizonY = h * 0.4;
 
     const scale = focal / z;
     const sx = w * 0.5 + (worldX - this.cameraX) * scale;
@@ -641,15 +668,20 @@ export class ParkourEngine {
     return { x: sx, y: sy, scale };
   }
 
+  // Ufuktan yumuşak belirme (pop-in yerine sinematik derinlik geçişi)
+  depthAlpha(relZ) {
+    if (relZ <= VIEW_DISTANCE - 9) return 1;
+    return Math.max(0, (VIEW_DISTANCE - relZ) / 9);
+  }
+
   draw() {
     const ctx = this.ctx;
-    const w = this.canvas.width;
-    const h = this.canvas.height;
+    const w = this.viewWidth;
+    const h = this.viewHeight;
     if (!w || !h) return;
 
     ctx.clearRect(0, 0, w, h);
 
-    // Hafif dinamik POV yatış (şerit değiştirirken canlı koşu hissi verir)
     ctx.save();
     ctx.translate(w / 2, h / 2);
     ctx.rotate(this.cameraRoll);
@@ -658,7 +690,6 @@ export class ParkourEngine {
     this.drawSkyAndHills(ctx, w, h);
     this.drawPathAndLanes(ctx, w, h);
 
-    // Derinlik sıralı çizim (ağaçlar + bayraklar + yıldızlar + engeller)
     const renderables = [];
 
     for (const item of this.scenery) {
@@ -685,6 +716,10 @@ export class ParkourEngine {
     renderables.sort((a, b) => b.z - a.z);
 
     for (const r of renderables) {
+      const alpha = this.depthAlpha(r.z);
+      if (alpha <= 0.02) continue;
+      ctx.save();
+      ctx.globalAlpha = alpha;
       if (r.kind === 'scenery') {
         this.drawSceneryItem(ctx, r.obj, r.z);
       } else if (r.kind === 'star') {
@@ -692,22 +727,21 @@ export class ParkourEngine {
       } else {
         this.drawObstacle(ctx, r.obj, r.z);
       }
+      ctx.restore();
     }
 
-    // Hız rüzgarı çizgileri (sadece hız desteği veya 4+ seri varken, çok nazik beyaz çizgiler)
     if (this.isRunning && this.countdownTimer <= 0 && (this.boostTimer > 0 || this.streak >= 4)) {
       this.drawGentleWindLines(ctx, w, h);
     }
 
     ctx.restore();
 
-    // Parçacıklar ve arayüz ipuçları (düz, yatışsız)
     for (const p of this.particles) {
       p.draw(ctx);
     }
 
     if (this.isRunning && this.countdownTimer > 0) {
-      this.drawCountdownOverlay(ctx, w, h);
+      this.drawPrepCountdown(ctx, w, h);
     } else if (this.isRunning) {
       this.drawUpcomingCue(ctx, w);
       this.drawStanceIndicator(ctx, w, h);
@@ -719,66 +753,77 @@ export class ParkourEngine {
   }
 
   drawSkyAndHills(ctx, w, h) {
-    const horizonY = h * 0.41;
+    const horizonY = h * 0.4;
 
-    // Canlı, güneşli ama mat masal gökyüzü (aşırı parlak/neon değil)
+    // Zengin güneşli sabah gökyüzü
     const skyGrad = ctx.createLinearGradient(0, 0, 0, horizonY);
-    skyGrad.addColorStop(0, '#9fc7dc');
-    skyGrad.addColorStop(0.6, '#cde2eb');
-    skyGrad.addColorStop(1, '#f4ecdc');
+    skyGrad.addColorStop(0, '#8dbbd6');
+    skyGrad.addColorStop(0.55, '#c2dde9');
+    skyGrad.addColorStop(1, '#f4ebd7');
     ctx.fillStyle = skyGrad;
     ctx.fillRect(-40, -40, w + 80, horizonY + 46);
 
-    // Sıcak güneş ve yumuşak halesi (parlamayan mat katmanlar)
-    const sunX = w * 0.82;
-    const sunY = h * 0.15;
+    // Katmanlı sıcak mat güneş
+    const sunX = w * 0.8;
+    const sunY = h * 0.14;
     const sunR = Math.min(w, h) * 0.052;
-    ctx.fillStyle = 'rgba(244, 217, 146, 0.32)';
+    ctx.fillStyle = 'rgba(246, 223, 158, 0.24)';
     ctx.beginPath();
-    ctx.arc(sunX, sunY, sunR * 1.48, 0, Math.PI * 2);
+    ctx.arc(sunX, sunY, sunR * 1.9, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = '#f2cf7e';
+    ctx.fillStyle = 'rgba(246, 223, 158, 0.42)';
+    ctx.beginPath();
+    ctx.arc(sunX, sunY, sunR * 1.38, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#f5d27b';
     ctx.beginPath();
     ctx.arc(sunX, sunY, sunR, 0, Math.PI * 2);
     ctx.fill();
 
-    // Bulutlar
-    ctx.fillStyle = 'rgba(253, 251, 246, 0.92)';
+    // Hacimli, alt gölgeli bulutlar
     this.clouds.forEach((c) => {
       const cx = c.x * w;
       const cy = c.y * h;
-      const r = Math.min(w, h) * 0.042 * c.scale;
+      const r = Math.min(w, h) * 0.04 * c.scale;
+
+      ctx.fillStyle = 'rgba(222, 232, 236, 0.72)';
+      ctx.beginPath();
+      ctx.ellipse(cx + r * 0.85, cy + r * 0.32, r * 1.55, r * 0.48, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = 'rgba(254, 252, 248, 0.96)';
       ctx.beginPath();
       ctx.arc(cx, cy, r, 0, Math.PI * 2);
-      ctx.arc(cx + r * 0.9, cy - r * 0.25, r * 0.85, 0, Math.PI * 2);
-      ctx.arc(cx + r * 1.75, cy + r * 0.05, r * 0.72, 0, Math.PI * 2);
+      ctx.arc(cx + r * 0.85, cy - r * 0.28, r * 0.9, 0, Math.PI * 2);
+      ctx.arc(cx + r * 1.72, cy + r * 0.02, r * 0.76, 0, Math.PI * 2);
       ctx.fill();
     });
 
-    // Uzak dağ silüeti
-    ctx.fillStyle = '#a5bfa5';
+    // Uzak mavi-yeşil dağ sırası (atmosfer derinliği)
+    ctx.fillStyle = '#99b8b3';
     ctx.beginPath();
-    ctx.moveTo(-40, horizonY + 6);
-    ctx.lineTo(w * 0.14, horizonY - h * 0.14);
-    ctx.lineTo(w * 0.34, horizonY - h * 0.04);
-    ctx.lineTo(w * 0.56, horizonY - h * 0.16);
-    ctx.lineTo(w * 0.78, horizonY - h * 0.06);
-    ctx.lineTo(w + 40, horizonY - h * 0.12);
-    ctx.lineTo(w + 40, horizonY + 10);
+    ctx.moveTo(-40, horizonY + 8);
+    ctx.lineTo(w * 0.12, horizonY - h * 0.14);
+    ctx.lineTo(w * 0.28, horizonY - h * 0.05);
+    ctx.lineTo(w * 0.46, horizonY - h * 0.17);
+    ctx.lineTo(w * 0.68, horizonY - h * 0.06);
+    ctx.lineTo(w * 0.86, horizonY - h * 0.14);
+    ctx.lineTo(w + 40, horizonY - h * 0.04);
+    ctx.lineTo(w + 40, horizonY + 12);
     ctx.closePath();
     ctx.fill();
 
-    // Yakın yumuşak tepeler
-    ctx.fillStyle = '#97ba8e';
+    // Orta katman yeşil tepeler
+    ctx.fillStyle = '#8db487';
     ctx.beginPath();
-    ctx.moveTo(-40, horizonY + 6);
-    ctx.quadraticCurveTo(w * 0.24, horizonY - h * 0.08, w * 0.5, horizonY + 2);
-    ctx.quadraticCurveTo(w * 0.78, horizonY - h * 0.09, w + 40, horizonY);
-    ctx.lineTo(w + 40, horizonY + 10);
+    ctx.moveTo(-40, horizonY + 8);
+    ctx.quadraticCurveTo(w * 0.2, horizonY - h * 0.095, w * 0.44, horizonY + 1);
+    ctx.quadraticCurveTo(w * 0.74, horizonY - h * 0.105, w + 40, horizonY - 2);
+    ctx.lineTo(w + 40, horizonY + 12);
     ctx.closePath();
     ctx.fill();
 
-    // Minik süzülen kelebekler
+    // Süzülen kelebekler
     this.butterflies.forEach((b) => {
       const bx = b.x * w;
       const by = b.y * h + Math.sin(b.phase) * 9;
@@ -790,13 +835,22 @@ export class ParkourEngine {
       ctx.fill();
     });
 
-    // Canlı güneşli çayır
+    // Zengin dokulu çayır zemini
     const meadowGrad = ctx.createLinearGradient(0, horizonY, 0, h);
-    meadowGrad.addColorStop(0, '#96ba88');
-    meadowGrad.addColorStop(0.55, '#82ab74');
-    meadowGrad.addColorStop(1, '#6f9962');
+    meadowGrad.addColorStop(0, '#a0c192');
+    meadowGrad.addColorStop(0.28, '#87b079');
+    meadowGrad.addColorStop(0.7, '#75a067');
+    meadowGrad.addColorStop(1, '#638f57');
     ctx.fillStyle = meadowGrad;
     ctx.fillRect(-40, horizonY, w + 80, h - horizonY + 40);
+
+    // Ufuk sis şeridi (gökyüzü ile çayır arasında yumuşak HD geçiş)
+    const mistGrad = ctx.createLinearGradient(0, horizonY - 12, 0, horizonY + 34);
+    mistGrad.addColorStop(0, 'rgba(244, 235, 215, 0)');
+    mistGrad.addColorStop(0.45, 'rgba(244, 235, 215, 0.55)');
+    mistGrad.addColorStop(1, 'rgba(244, 235, 215, 0)');
+    ctx.fillStyle = mistGrad;
+    ctx.fillRect(-40, horizonY - 12, w + 80, 46);
   }
 
   drawPathAndLanes(ctx, w, h) {
@@ -808,8 +862,27 @@ export class ParkourEngine {
     const nearL = this.project(-ROAD_HALF_WIDTH, 0, nearZ);
     const nearR = this.project(ROAD_HALF_WIDTH, 0, nearZ);
 
-    // Sıcak altın-kum parkur yolu
-    ctx.fillStyle = '#e5d3b3';
+    // Dış çim-toprak kenar bordürü
+    const farOL = this.project(-ROAD_HALF_WIDTH - 0.22, 0, farZ);
+    const farOR = this.project(ROAD_HALF_WIDTH + 0.22, 0, farZ);
+    const nearOL = this.project(-ROAD_HALF_WIDTH - 0.22, 0, nearZ);
+    const nearOR = this.project(ROAD_HALF_WIDTH + 0.22, 0, nearZ);
+
+    ctx.fillStyle = '#b99c72';
+    ctx.beginPath();
+    ctx.moveTo(farOL.x, farOL.y);
+    ctx.lineTo(farOR.x, farOR.y);
+    ctx.lineTo(nearOR.x, nearOR.y);
+    ctx.lineTo(nearOL.x, nearOL.y);
+    ctx.closePath();
+    ctx.fill();
+
+    // Sıcak perspektif geçişli toprak parkur yolu
+    const roadGrad = ctx.createLinearGradient(0, farL.y, 0, nearL.y);
+    roadGrad.addColorStop(0, '#eadbc2');
+    roadGrad.addColorStop(0.5, '#e2cea9');
+    roadGrad.addColorStop(1, '#d6be94');
+    ctx.fillStyle = roadGrad;
     ctx.beginPath();
     ctx.moveTo(farL.x, farL.y);
     ctx.lineTo(farR.x, farR.y);
@@ -818,10 +891,10 @@ export class ParkourEngine {
     ctx.closePath();
     ctx.fill();
 
-    // Yatay taş / ahşap bantlar (koşu hızını çok keyifli hissettirir, göz yormaz)
+    // Ritmik yol bantları
     const bandStep = 3.2;
     const bandOffset = this.distance % (bandStep * 2);
-    ctx.fillStyle = 'rgba(196, 172, 134, 0.24)';
+    ctx.fillStyle = 'rgba(176, 148, 108, 0.16)';
     for (let z = farZ - bandOffset; z > 0.8; z -= bandStep * 2) {
       const zFar = Math.min(farZ, z);
       const zNear = Math.max(0.55, z - bandStep);
@@ -838,22 +911,23 @@ export class ParkourEngine {
       ctx.fill();
     }
 
-    // Yol kenarı ahşap bordür çizgisi
-    ctx.strokeStyle = '#c19f73';
-    ctx.lineWidth = 5;
-    ctx.beginPath();
-    ctx.moveTo(farL.x, farL.y);
-    ctx.lineTo(nearL.x, nearL.y);
-    ctx.moveTo(farR.x, farR.y);
-    ctx.lineTo(nearR.x, nearR.y);
-    ctx.stroke();
+    // Minik yol çakıl taşları (HD doku hissi)
+    for (const peb of this.roadPebbles) {
+      if (peb.z < 0.9 || peb.z > VIEW_DISTANCE - 6) continue;
+      const p = this.project(peb.x, 0.005, peb.z);
+      const rx = Math.max(1.2, p.scale * peb.r);
+      ctx.fillStyle = peb.shade;
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y, rx, rx * 0.42, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     // 3 Şerit kesikli çizgileri
     const laneDividers = [-LANE_WIDTH * 0.5, LANE_WIDTH * 0.5];
     const dashSpacing = 3.8;
     const offset = this.distance % dashSpacing;
 
-    ctx.strokeStyle = 'rgba(255, 252, 245, 0.72)';
+    ctx.strokeStyle = 'rgba(255, 252, 245, 0.78)';
     ctx.lineCap = 'round';
 
     for (const divX of laneDividers) {
@@ -862,7 +936,7 @@ export class ParkourEngine {
         const z2 = Math.max(0.55, z - 1.5);
         const p1 = this.project(divX, 0.01, z1);
         const p2 = this.project(divX, 0.01, z2);
-        ctx.lineWidth = Math.max(1.6, p2.scale * 0.06);
+        ctx.lineWidth = Math.max(1.6, p2.scale * 0.055);
         ctx.beginPath();
         ctx.moveTo(p1.x, p1.y);
         ctx.lineTo(p2.x, p2.y);
@@ -871,64 +945,114 @@ export class ParkourEngine {
     }
   }
 
+  drawGroundShadow(ctx, cx, cy, rx, ry) {
+    ctx.fillStyle = 'rgba(54, 68, 46, 0.22)';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, Math.max(2, rx), Math.max(1, ry), 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   drawSceneryItem(ctx, item, z) {
     const base = this.project(item.x, 0, z);
     const s = base.scale * item.scale;
     if (s < 3) return;
 
     ctx.save();
-    if (item.type === 'flagPost') {
-      // Parkur kenarı neşeli üçgen flama direği!
+    if (item.type === 'grassTuft') {
+      ctx.strokeStyle = '#58824e';
+      ctx.lineWidth = Math.max(1.5, s * 0.08);
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(base.x, base.y);
+      ctx.lineTo(base.x - s * 0.22, base.y - s * 0.42);
+      ctx.moveTo(base.x, base.y);
+      ctx.lineTo(base.x + s * 0.04, base.y - s * 0.52);
+      ctx.moveTo(base.x, base.y);
+      ctx.lineTo(base.x + s * 0.25, base.y - s * 0.38);
+      ctx.stroke();
+    } else if (item.type === 'flagPost') {
+      this.drawGroundShadow(ctx, base.x, base.y, s * 0.3, s * 0.1);
       const poleH = s * 1.95;
-      ctx.strokeStyle = '#8d6844';
+      ctx.strokeStyle = '#825c39';
       ctx.lineWidth = Math.max(2, s * 0.09);
       ctx.beginPath();
       ctx.moveTo(base.x, base.y);
       ctx.lineTo(base.x, base.y - poleH);
       ctx.stroke();
 
+      // Direk başı topuz
+      ctx.fillStyle = '#e8b84b';
+      ctx.beginPath();
+      ctx.arc(base.x, base.y - poleH, Math.max(2, s * 0.09), 0, Math.PI * 2);
+      ctx.fill();
+
       const flagColors = ['#df7f62', '#e8b84b', '#6ea4bf'];
       const flutter = Math.sin(this.time * 4.5 + z) * s * 0.08;
-      const dir = -item.side; // Yola doğru hafif dalgalanır
+      const dir = -item.side;
       ctx.fillStyle = flagColors[item.tint % flagColors.length];
       ctx.beginPath();
-      ctx.moveTo(base.x, base.y - poleH);
-      ctx.lineTo(base.x + dir * s * 0.75, base.y - poleH + s * 0.2 + flutter);
-      ctx.lineTo(base.x, base.y - poleH + s * 0.45);
+      ctx.moveTo(base.x, base.y - poleH + s * 0.06);
+      ctx.lineTo(base.x + dir * s * 0.78, base.y - poleH + s * 0.24 + flutter);
+      ctx.lineTo(base.x, base.y - poleH + s * 0.48);
       ctx.closePath();
       ctx.fill();
     } else if (item.type === 'pine') {
+      this.drawGroundShadow(ctx, base.x + s * 0.12, base.y, s * 0.82, s * 0.22);
       const sway = Math.sin(this.time * 1.6 + z * 0.4) * s * 0.03;
-      ctx.fillStyle = '#8b6543';
-      ctx.fillRect(base.x - s * 0.14, base.y - s * 0.7, s * 0.28, s * 0.7);
 
-      ctx.fillStyle = item.tint === 0 ? '#5b8a57' : '#699962';
+      ctx.fillStyle = '#7c5838';
+      ctx.fillRect(base.x - s * 0.14, base.y - s * 0.72, s * 0.28, s * 0.72);
+
+      // İki tonlu gölgeli çam katmanları (HD derinlik)
+      ctx.fillStyle = item.tint === 0 ? '#4e7c4b' : '#5b8a55';
       ctx.beginPath();
       ctx.moveTo(base.x + sway, base.y - s * 2.55);
-      ctx.lineTo(base.x - s * 0.92, base.y - s * 0.65);
-      ctx.lineTo(base.x + s * 0.92, base.y - s * 0.65);
+      ctx.lineTo(base.x - s * 0.94, base.y - s * 0.65);
+      ctx.lineTo(base.x + s * 0.94, base.y - s * 0.65);
       ctx.closePath();
       ctx.fill();
 
-      ctx.fillStyle = item.tint === 0 ? '#6e9c68' : '#7bad72';
+      // Güneşli sağ yan parıltı
+      ctx.fillStyle = 'rgba(210, 232, 185, 0.22)';
       ctx.beginPath();
-      ctx.moveTo(base.x + sway * 1.3, base.y - s * 3.05);
+      ctx.moveTo(base.x + sway, base.y - s * 2.55);
+      ctx.lineTo(base.x, base.y - s * 0.65);
+      ctx.lineTo(base.x + s * 0.94, base.y - s * 0.65);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = item.tint === 0 ? '#659460' : '#73a36a';
+      ctx.beginPath();
+      ctx.moveTo(base.x + sway * 1.3, base.y - s * 3.08);
       ctx.lineTo(base.x - s * 0.68, base.y - s * 1.48);
       ctx.lineTo(base.x + s * 0.68, base.y - s * 1.48);
       ctx.closePath();
       ctx.fill();
     } else if (item.type === 'roundTree') {
-      ctx.fillStyle = '#8e6946';
-      ctx.fillRect(base.x - s * 0.16, base.y - s * 1.15, s * 0.32, s * 1.15);
+      this.drawGroundShadow(ctx, base.x + s * 0.14, base.y, s * 0.88, s * 0.24);
 
-      ctx.fillStyle = item.tint === 0 ? '#69975e' : '#7ba66c';
+      ctx.fillStyle = '#825d3c';
+      ctx.fillRect(base.x - s * 0.16, base.y - s * 1.18, s * 0.32, s * 1.18);
+
+      // Koyu taban yaprak gölgesi
+      ctx.fillStyle = '#588450';
       ctx.beginPath();
-      ctx.arc(base.x, base.y - s * 1.68, s * 0.86, 0, Math.PI * 2);
-      ctx.arc(base.x - s * 0.52, base.y - s * 1.4, s * 0.58, 0, Math.PI * 2);
-      ctx.arc(base.x + s * 0.52, base.y - s * 1.4, s * 0.58, 0, Math.PI * 2);
+      ctx.arc(base.x - s * 0.48, base.y - s * 1.34, s * 0.58, 0, Math.PI * 2);
+      ctx.arc(base.x + s * 0.48, base.y - s * 1.34, s * 0.58, 0, Math.PI * 2);
       ctx.fill();
 
-      // Ağaçta minik sıcak elmalar/çiçekler
+      // Ana yaprak tacı
+      ctx.fillStyle = item.tint === 0 ? '#6a9860' : '#7aa76c';
+      ctx.beginPath();
+      ctx.arc(base.x, base.y - s * 1.72, s * 0.86, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Üst güneşli tepe vurgusu
+      ctx.fillStyle = 'rgba(225, 240, 198, 0.28)';
+      ctx.beginPath();
+      ctx.arc(base.x + s * 0.2, base.y - s * 1.98, s * 0.44, 0, Math.PI * 2);
+      ctx.fill();
+
       if (s > 11 && item.tint === 1) {
         ctx.fillStyle = '#df7f62';
         ctx.beginPath();
@@ -937,15 +1061,19 @@ export class ParkourEngine {
         ctx.fill();
       }
     } else {
-      ctx.fillStyle = '#6c9862';
+      this.drawGroundShadow(ctx, base.x, base.y, s * 0.7, s * 0.18);
+      ctx.fillStyle = '#5e8b55';
       ctx.beginPath();
-      ctx.arc(base.x, base.y - s * 0.42, s * 0.54, 0, Math.PI * 2);
-      ctx.arc(base.x - s * 0.38, base.y - s * 0.28, s * 0.38, 0, Math.PI * 2);
-      ctx.arc(base.x + s * 0.38, base.y - s * 0.28, s * 0.38, 0, Math.PI * 2);
+      ctx.arc(base.x - s * 0.36, base.y - s * 0.26, s * 0.38, 0, Math.PI * 2);
+      ctx.arc(base.x + s * 0.36, base.y - s * 0.26, s * 0.38, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#73a067';
+      ctx.beginPath();
+      ctx.arc(base.x, base.y - s * 0.44, s * 0.52, 0, Math.PI * 2);
       ctx.fill();
 
       if (s > 9) {
-        const flowerCols = ['#f2cf7e', '#e38c72', '#a8cfe0'];
+        const flowerCols = ['#f4d17a', '#e38c72', '#a8cfe0'];
         ctx.fillStyle = flowerCols[item.tint % flowerCols.length];
         ctx.beginPath();
         ctx.arc(base.x - s * 0.2, base.y - s * 0.54, s * 0.11, 0, Math.PI * 2);
@@ -957,9 +1085,6 @@ export class ParkourEngine {
     ctx.restore();
   }
 
-  /**
-   * Yol boyunca süzülen mat altın yıldız (zıplayarak / eğilerek / şerit değiştirerek toplanır)
-   */
   drawCollectibleStar(ctx, col, relZ) {
     const hover = Math.sin(this.time * 4 + col.z) * 0.12;
     const p = this.project(col.lane * LANE_WIDTH, col.y + hover, relZ);
@@ -968,20 +1093,18 @@ export class ParkourEngine {
     if (r < 4) return;
 
     ctx.save();
-    // Zeminde yumuşak gölge (yıldızın yüksekliğini anında belli eder!)
-    ctx.fillStyle = 'rgba(92, 78, 58, 0.2)';
+    ctx.fillStyle = 'rgba(92, 78, 58, 0.24)';
     ctx.beginPath();
     ctx.ellipse(ground.x, ground.y, r * 0.72, r * 0.24, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Yatay eksende nazikçe dönen altın yıldız
     const spinScaleX = 0.55 + Math.abs(Math.cos(this.time * 2.8 + col.z)) * 0.45;
     ctx.translate(p.x, p.y);
     ctx.scale(spinScaleX, 1);
 
-    ctx.fillStyle = '#f0c24f';
-    ctx.strokeStyle = '#b58422';
-    ctx.lineWidth = Math.max(1.5, r * 0.1);
+    ctx.fillStyle = '#f2c34b';
+    ctx.strokeStyle = '#a8781b';
+    ctx.lineWidth = Math.max(1.8, r * 0.1);
     ctx.beginPath();
     for (let i = 0; i < 10; i++) {
       const rad = i % 2 === 0 ? r : r * 0.48;
@@ -995,13 +1118,19 @@ export class ParkourEngine {
     ctx.fill();
     ctx.stroke();
 
+    // İç parlak altın yıldız vurgusu
+    ctx.fillStyle = '#fae196';
+    ctx.beginPath();
+    ctx.arc(-r * 0.12, -r * 0.14, r * 0.22, 0, Math.PI * 2);
+    ctx.fill();
+
     ctx.restore();
   }
 
   drawObstacle(ctx, obs, relZ) {
     ctx.save();
     if (obs.hit) {
-      ctx.globalAlpha = 0.4;
+      ctx.globalAlpha = 0.38;
     }
 
     if (obs.type === 'dodge') {
@@ -1020,14 +1149,13 @@ export class ParkourEngine {
   }
 
   drawDodgeObstacle(ctx, obs, relZ) {
-    // Açık şeritte yeşil yön oku (çocuk hemen açık yolu görsün!)
     const openBase = this.project(obs.openLane * LANE_WIDTH, 0.02, relZ + 1.4);
     if (openBase.scale > 8) {
       const r = openBase.scale * 0.44;
       ctx.save();
       ctx.fillStyle = 'rgba(91, 142, 84, 0.32)';
       ctx.beginPath();
-      ctx.ellipse(openBase.x, openBase.y, r * 1.15, r * 0.4, 0, 0, Math.PI * 2);
+      ctx.ellipse(openBase.x, openBase.y, r * 1.15, r * 0.38, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
     }
@@ -1042,10 +1170,13 @@ export class ParkourEngine {
       const height = bl.y - tl.y;
       if (width < 4) continue;
 
+      // Engel zemin gölgesi
+      this.drawGroundShadow(ctx, (bl.x + br.x) * 0.5, bl.y + height * 0.03, width * 0.54, Math.max(4, height * 0.1));
+
       if (obs.style === 'fence') {
-        ctx.fillStyle = '#9f764f';
-        ctx.strokeStyle = '#6f4e30';
-        ctx.lineWidth = Math.max(1.5, width * 0.025);
+        ctx.fillStyle = '#976e47';
+        ctx.strokeStyle = '#68472a';
+        ctx.lineWidth = Math.max(1.5, width * 0.024);
 
         const postW = width * 0.14;
         [0.08, 0.43, 0.78].forEach((ratio) => {
@@ -1063,35 +1194,39 @@ export class ParkourEngine {
           ctx.stroke();
         });
       } else if (obs.style === 'crates') {
-        // Renkli boyalı ahşap macera sandığı
         ctx.fillStyle = '#d48668';
-        ctx.strokeStyle = '#96543d';
+        ctx.strokeStyle = '#8c4b35';
         ctx.lineWidth = Math.max(1.8, width * 0.03);
         ctx.beginPath();
         ctx.roundRect(bl.x + width * 0.04, tl.y + height * 0.08, width * 0.92, height * 0.92, Math.max(4, width * 0.08));
         ctx.fill();
         ctx.stroke();
 
-        // Çapraz ahşap çıta
+        // Üst kenar ışık şeridi
+        ctx.fillStyle = 'rgba(255, 245, 232, 0.22)';
+        ctx.fillRect(bl.x + width * 0.08, tl.y + height * 0.12, width * 0.84, height * 0.12);
+
         ctx.strokeStyle = '#f3e7d3';
-        ctx.lineWidth = Math.max(2, width * 0.045);
+        ctx.lineWidth = Math.max(2, width * 0.042);
         ctx.beginPath();
-        ctx.moveTo(bl.x + width * 0.14, tl.y + height * 0.18);
-        ctx.lineTo(bl.x + width * 0.86, bl.y - height * 0.12);
-        ctx.moveTo(bl.x + width * 0.86, tl.y + height * 0.18);
-        ctx.lineTo(bl.x + width * 0.14, bl.y - height * 0.12);
+        ctx.moveTo(bl.x + width * 0.15, tl.y + height * 0.2);
+        ctx.lineTo(bl.x + width * 0.85, bl.y - height * 0.12);
+        ctx.moveTo(bl.x + width * 0.85, tl.y + height * 0.2);
+        ctx.lineTo(bl.x + width * 0.15, bl.y - height * 0.12);
         ctx.stroke();
       } else {
-        // Saman balyası
         ctx.fillStyle = '#dfb966';
-        ctx.strokeStyle = '#a8843c';
-        ctx.lineWidth = Math.max(1.5, width * 0.025);
+        ctx.strokeStyle = '#9e7a34';
+        ctx.lineWidth = Math.max(1.6, width * 0.025);
         ctx.beginPath();
         ctx.roundRect(bl.x, tl.y + height * 0.12, width, height * 0.88, Math.max(4, width * 0.12));
         ctx.fill();
         ctx.stroke();
 
-        ctx.strokeStyle = '#8f6d2e';
+        ctx.fillStyle = 'rgba(255, 245, 210, 0.25)';
+        ctx.fillRect(bl.x + width * 0.06, tl.y + height * 0.17, width * 0.88, height * 0.14);
+
+        ctx.strokeStyle = '#8a692b';
         ctx.beginPath();
         ctx.moveTo(bl.x + width * 0.28, tl.y + height * 0.12);
         ctx.lineTo(bl.x + width * 0.28, bl.y);
@@ -1110,31 +1245,30 @@ export class ParkourEngine {
     const height = leftBase.y - leftTop.y;
     if (width < 8) return;
 
+    this.drawGroundShadow(ctx, (leftBase.x + rightBase.x) * 0.5, leftBase.y + height * 0.06, width * 0.5, Math.max(4, height * 0.16));
+
     if (obs.style === 'hurdle') {
-      // Kırmızı-krem çizgili eğlenceli parkur engeli
       const barH = height * 0.42;
       const postW = Math.max(4, width * 0.045);
-      ctx.fillStyle = '#8b6847';
+      ctx.fillStyle = '#855f3d';
       ctx.fillRect(leftBase.x, leftTop.y, postW, height);
       ctx.fillRect(rightBase.x - postW, leftTop.y, postW, height);
 
       ctx.fillStyle = '#df7f62';
-      ctx.strokeStyle = '#9e4f39';
+      ctx.strokeStyle = '#994a34';
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.roundRect(leftBase.x, leftTop.y, width, barH, Math.max(4, barH * 0.3));
       ctx.fill();
       ctx.stroke();
 
-      // Krem şeritler
       ctx.fillStyle = '#faf5ea';
-      const stripes = 5;
-      for (let i = 0; i < stripes; i++) {
+      for (let i = 0; i < 5; i++) {
         ctx.fillRect(leftBase.x + width * (0.1 + i * 0.18), leftTop.y + 2, width * 0.08, barH - 4);
       }
     } else {
-      ctx.fillStyle = obs.style === 'log' ? '#8c623d' : '#6ea4bf';
-      ctx.strokeStyle = obs.style === 'log' ? '#5e3f25' : '#4d7d96';
+      ctx.fillStyle = obs.style === 'log' ? '#8c623d' : '#689eb9';
+      ctx.strokeStyle = obs.style === 'log' ? '#5a3b22' : '#45768f';
       ctx.lineWidth = Math.max(2, height * 0.06);
       ctx.beginPath();
       ctx.roundRect(leftBase.x, leftTop.y, width, height, Math.max(4, height * 0.42));
@@ -1142,13 +1276,18 @@ export class ParkourEngine {
       ctx.stroke();
 
       if (obs.style === 'log') {
-        ctx.strokeStyle = 'rgba(242, 226, 204, 0.4)';
+        ctx.fillStyle = 'rgba(250, 232, 204, 0.18)';
+        ctx.beginPath();
+        ctx.roundRect(leftBase.x + width * 0.04, leftTop.y + height * 0.14, width * 0.92, height * 0.24, height * 0.12);
+        ctx.fill();
+
+        ctx.strokeStyle = 'rgba(242, 226, 204, 0.42)';
         ctx.lineWidth = Math.max(1.4, height * 0.045);
         ctx.beginPath();
-        ctx.moveTo(leftBase.x + width * 0.12, leftTop.y + height * 0.38);
-        ctx.lineTo(leftBase.x + width * 0.44, leftTop.y + height * 0.38);
-        ctx.moveTo(leftBase.x + width * 0.56, leftTop.y + height * 0.64);
-        ctx.lineTo(leftBase.x + width * 0.88, leftTop.y + height * 0.64);
+        ctx.moveTo(leftBase.x + width * 0.12, leftTop.y + height * 0.44);
+        ctx.lineTo(leftBase.x + width * 0.44, leftTop.y + height * 0.44);
+        ctx.moveTo(leftBase.x + width * 0.56, leftTop.y + height * 0.68);
+        ctx.lineTo(leftBase.x + width * 0.88, leftTop.y + height * 0.68);
         ctx.stroke();
       } else {
         ctx.fillStyle = '#d8e8ed';
@@ -1161,7 +1300,7 @@ export class ParkourEngine {
 
     if (width > 62) {
       const signCx = (leftBase.x + rightBase.x) * 0.5;
-      const signW = Math.min(134, width * 0.32);
+      const signW = Math.min(132, width * 0.32);
       const signH = Math.min(34, height * 0.88);
       const signY = leftTop.y - signH - Math.max(6, height * 0.18);
 
@@ -1192,8 +1331,11 @@ export class ParkourEngine {
     const pillarW = Math.max(5, width * 0.075);
     if (width < 10) return;
 
-    ctx.fillStyle = '#8b6542';
-    ctx.strokeStyle = '#5e4229';
+    // Kemer gölgesi yerde (altından geçilecek boşluğu net gösterir!)
+    this.drawGroundShadow(ctx, (leftBase.x + rightBase.x) * 0.5, leftBase.y + 3, width * 0.48, Math.max(4, beamH * 0.16));
+
+    ctx.fillStyle = '#855e3b';
+    ctx.strokeStyle = '#5a3d24';
     ctx.lineWidth = Math.max(1.5, pillarW * 0.12);
     ctx.fillRect(leftBase.x, leftTop.y, pillarW, leftBase.y - leftTop.y);
     ctx.strokeRect(leftBase.x, leftTop.y, pillarW, leftBase.y - leftTop.y);
@@ -1207,7 +1349,6 @@ export class ParkourEngine {
     ctx.stroke();
 
     if (obs.style === 'bunting') {
-      // Kirişten sarkan renkli mat bayrak üçgenleri!
       const flags = 7;
       const fw = width / flags;
       const colors = ['#df7f62', '#f0c24f', '#6ea4bf', '#759f6b'];
@@ -1223,10 +1364,9 @@ export class ParkourEngine {
         ctx.fill();
       }
     } else {
-      ctx.fillStyle = '#6b9461';
-      const leafCount = 7;
-      for (let i = 0; i < leafCount; i++) {
-        const lx = leftBase.x + (width / (leafCount - 1)) * i;
+      ctx.fillStyle = '#65905b';
+      for (let i = 0; i < 7; i++) {
+        const lx = leftBase.x + (width / 6) * i;
         ctx.beginPath();
         ctx.arc(lx, leftTop.y + beamH * 0.14, Math.max(4, beamH * 0.34), 0, Math.PI * 2);
         ctx.fill();
@@ -1236,7 +1376,7 @@ export class ParkourEngine {
     if (width > 68) {
       const cx = (leftBase.x + rightBase.x) * 0.5;
       const cy = leftTop.y + beamH * 0.54;
-      const pillW = Math.min(128, width * 0.33);
+      const pillW = Math.min(126, width * 0.33);
       const pillH = Math.min(34, beamH * 0.56);
 
       ctx.fillStyle = '#faf6ec';
@@ -1275,7 +1415,7 @@ export class ParkourEngine {
 
     if (obs.curtainOpen < 0.98) {
       ctx.save();
-      ctx.fillStyle = obs.matched ? 'rgba(211, 234, 203, 0.92)' : 'rgba(250, 244, 232, 0.95)';
+      ctx.fillStyle = obs.matched ? 'rgba(211, 234, 203, 0.93)' : 'rgba(250, 244, 232, 0.96)';
       ctx.strokeStyle = obs.matched ? '#5e8e56' : '#c2ae92';
       ctx.lineWidth = 2.5;
 
@@ -1301,7 +1441,6 @@ export class ParkourEngine {
           drawLiveMirrorOverlay(ctx, this.livePose, this.liveBodyScale, cx, cy, silSize, obs.matched);
         }
 
-        // Bacak gerektiren pozda ayaklar kamerada henüz görünmüyorsa nazik not göster
         if (obs.poseDef.usesLegs && !this.liveHasLegs && this.livePose && !obs.matched && width > 130) {
           ctx.fillStyle = '#8c5742';
           ctx.font = `700 ${Math.max(10, Math.min(13, innerW * 0.045))}px Nunito, sans-serif`;
@@ -1315,7 +1454,7 @@ export class ParkourEngine {
           const barW = Math.min(150, innerW * 0.52);
           const barH = 12;
           const bx = cx - barW / 2;
-          const by = panelY + panelH - 24;
+          const by = panelY + panelH - 26;
           ctx.fillStyle = '#ddd2c0';
           ctx.beginPath();
           ctx.roundRect(bx, by, barW, barH, 6);
@@ -1329,16 +1468,14 @@ export class ParkourEngine {
       ctx.restore();
     }
 
-    // Ahşap kapı direkleri
-    ctx.fillStyle = '#99724d';
-    ctx.strokeStyle = '#684a2f';
+    ctx.fillStyle = '#946d49';
+    ctx.strokeStyle = '#63462c';
     ctx.lineWidth = Math.max(2, postW * 0.1);
     ctx.fillRect(leftBase.x, leftTop.y, postW, height);
     ctx.strokeRect(leftBase.x, leftTop.y, postW, height);
     ctx.fillRect(rightBase.x - postW, leftTop.y, postW, height);
     ctx.strokeRect(rightBase.x - postW, leftTop.y, postW, height);
 
-    // Üst başlık tabelası
     ctx.fillStyle = obs.matched ? '#5e8e56' : '#df7f62';
     ctx.beginPath();
     ctx.roundRect(leftBase.x - postW * 0.2, leftTop.y, width + postW * 0.4, headerH, Math.max(6, headerH * 0.25));
@@ -1365,7 +1502,7 @@ export class ParkourEngine {
     if (width < 10) return;
 
     const postW = Math.max(6, width * 0.08);
-    ctx.fillStyle = '#9b744f';
+    ctx.fillStyle = '#946d49';
     ctx.fillRect(leftBase.x, leftTop.y, postW, height);
     ctx.fillRect(rightBase.x - postW, leftTop.y, postW, height);
 
@@ -1412,33 +1549,75 @@ export class ParkourEngine {
     ctx.restore();
   }
 
-  drawCountdownOverlay(ctx, w, h) {
-    const num = Math.max(1, Math.ceil(this.countdownTimer / 0.75));
-    const subText = num === 3 ? 'Hazır Ol!' : num === 2 ? 'Yerini Al!' : 'Başlıyoruz!';
+  /**
+   * 5 saniyelik net, okunaklı bölüm başı hazırlık ekranı
+   */
+  drawPrepCountdown(ctx, w, h) {
+    const num = Math.max(1, Math.ceil(this.countdownTimer));
+    const title = `Parkur ${this.stage} Başlıyor!`;
+    const subText =
+      num >= 4
+        ? 'Kameranın karşısına geç, 2 adım geri çekil!'
+        : num === 3
+          ? 'Ayakların da kamerada görünsün!'
+          : num === 2
+            ? 'Dik dur, boyun ayarlanıyor...'
+            : 'Hazır ol, koşuya başlıyoruz!';
+
+    const playerOk = !!this.livePose;
+    const statusText = playerOk
+      ? this.liveHasLegs
+        ? '✓ Oyuncu ve bacaklar algılandı — Süper!'
+        : '✓ Oyuncu algılandı (Biraz geri çekilebilirsin)'
+      : 'Oyuncu kamerada aranıyor...';
 
     ctx.save();
-    const boxW = 220;
-    const boxH = 150;
+    const boxW = Math.min(w - 32, 420);
+    const boxH = 220;
     const bx = (w - boxW) / 2;
     const by = (h - boxH) / 2;
 
-    ctx.fillStyle = 'rgba(250, 247, 240, 0.94)';
-    ctx.strokeStyle = '#6f9468';
+    ctx.fillStyle = 'rgba(250, 247, 240, 0.95)';
+    ctx.strokeStyle = '#678f60';
     ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.roundRect(bx, by, boxW, boxH, 28);
+    ctx.roundRect(bx, by, boxW, boxH, 24);
     ctx.fill();
     ctx.stroke();
 
-    ctx.fillStyle = '#5e8e56';
-    ctx.font = '800 68px Nunito, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(String(num), w / 2, by + 64);
 
-    ctx.fillStyle = '#4a4036';
+    ctx.fillStyle = '#3d3730';
     ctx.font = '800 20px Nunito, sans-serif';
-    ctx.fillText(subText, w / 2, by + 118);
+    ctx.fillText(title, w / 2, by + 34);
+
+    // Geri sayım dairesi
+    const prog = this.countdownTimer / this.prepDuration;
+    ctx.strokeStyle = '#e3dacb';
+    ctx.lineWidth = 7;
+    ctx.beginPath();
+    ctx.arc(w / 2, by + 102, 40, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.strokeStyle = '#678f60';
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.arc(w / 2, by + 102, 40, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * prog);
+    ctx.stroke();
+
+    ctx.fillStyle = '#4e7847';
+    ctx.font = '800 44px Nunito, sans-serif';
+    ctx.fillText(String(num), w / 2, by + 104);
+
+    ctx.fillStyle = '#5a5046';
+    ctx.font = '700 15px Nunito, sans-serif';
+    ctx.fillText(subText, w / 2, by + 164);
+
+    ctx.fillStyle = playerOk ? '#46733f' : '#9c6c31';
+    ctx.font = '800 13px Nunito, sans-serif';
+    ctx.fillText(statusText, w / 2, by + 194);
+
     ctx.restore();
   }
 
@@ -1485,9 +1664,9 @@ export class ParkourEngine {
 
     ctx.fillStyle = bg;
     ctx.strokeStyle = border;
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 2.5;
     ctx.beginPath();
-    ctx.roundRect(px, py, pillW, pillH, 23);
+    ctx.roundRect(px, py, pillW, pillH, 21);
     ctx.fill();
     ctx.stroke();
 
@@ -1499,8 +1678,8 @@ export class ParkourEngine {
   }
 
   drawStanceIndicator(ctx, w, h) {
-    const barW = Math.min(270, w - 24);
-    const barH = 40;
+    const barW = Math.min(264, w - 24);
+    const barH = 38;
     const bx = (w - barW) / 2;
     const by = h - barH - 14;
 
@@ -1509,7 +1688,7 @@ export class ParkourEngine {
     ctx.strokeStyle = '#d4cab9';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.roundRect(bx, by, barW, barH, 21);
+    ctx.roundRect(bx, by, barW, barH, 19);
     ctx.fill();
     ctx.stroke();
 
@@ -1526,11 +1705,11 @@ export class ParkourEngine {
       if (active) {
         ctx.fillStyle = '#5e8e56';
         ctx.beginPath();
-        ctx.roundRect(sx + 4, by + 4, segW - 8, barH - 8, 16);
+        ctx.roundRect(sx + 4, by + 4, segW - 8, barH - 8, 14);
         ctx.fill();
       }
       ctx.fillStyle = active ? '#faf7f0' : '#6c6358';
-      ctx.font = '800 14px Nunito, sans-serif';
+      ctx.font = '800 13px Nunito, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(item.text, sx + segW / 2, by + barH / 2 + 1);
@@ -1546,19 +1725,19 @@ export class ParkourEngine {
       stanceBg = '#f0decb';
     }
 
-    const badgeW = 96;
+    const badgeW = 92;
     const badgeX = bx + barW + 10;
     if (badgeX + badgeW < w - 12) {
       ctx.fillStyle = stanceBg;
       ctx.strokeStyle = '#cfc5b4';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.roundRect(badgeX, by + 4, badgeW, barH - 8, 16);
+      ctx.roundRect(badgeX, by + 4, badgeW, barH - 8, 14);
       ctx.fill();
       ctx.stroke();
 
       ctx.fillStyle = '#4a4138';
-      ctx.font = '800 13px Nunito, sans-serif';
+      ctx.font = '800 12.5px Nunito, sans-serif';
       ctx.fillText(stanceText, badgeX + badgeW / 2, by + barH / 2 + 1);
     }
 
@@ -1569,18 +1748,18 @@ export class ParkourEngine {
     const alpha = Math.min(1, this.feedbackTimer * 1.5);
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.font = '800 22px Nunito, sans-serif';
+    ctx.font = '800 20px Nunito, sans-serif';
     const textW = ctx.measureText(this.feedbackText).width;
-    const boxW = textW + 44;
-    const boxH = 46;
+    const boxW = Math.min(w - 28, textW + 40);
+    const boxH = 42;
     const x = (w - boxW) / 2;
-    const y = h * 0.27;
+    const y = h * 0.26;
 
     ctx.fillStyle = 'rgba(250, 247, 240, 0.96)';
     ctx.strokeStyle = this.feedbackColor;
     ctx.lineWidth = 2.5;
     ctx.beginPath();
-    ctx.roundRect(x, y, boxW, boxH, 16);
+    ctx.roundRect(x, y, boxW, boxH, 15);
     ctx.fill();
     ctx.stroke();
 
