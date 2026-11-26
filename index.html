@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#ede7dc">
   <title>Doğa Parkuru — Kamera ile Hareket Oyunu</title>
@@ -15,11 +15,14 @@
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
 </head>
 <body>
+  <div id="drawer-backdrop" class="drawer-backdrop"></div>
+
   <div id="app-container">
-    <!-- Sol Panel: Kamera Önizleme ve Ayarlar (TV Modunda küçülüp köşeye yerleşir) -->
+    <!-- Sol Panel: Kamera Önizleme ve Ayarlar (Mobil/Tablet ve TV Modunda açılır çekmece + köşe önizleme) -->
     <aside id="camera-container" class="calm-panel">
       <div class="panel-header">
-        <span class="panel-title">Kamera Görünümü</span>
+        <span class="panel-title">Kamera ve Ayarlar</span>
+        <button id="btn-close-settings" class="btn-close-drawer" type="button" aria-label="Kapat">✕ Kapat</button>
       </div>
 
       <div class="video-wrapper">
@@ -81,42 +84,45 @@
 
     <!-- Sağ Alan: Birinci Şahıs (POV) Parkur Sahnesi -->
     <main id="game-container">
-      <!-- Üst Bilgi Çubuğu (Sade HUD) -->
+      <!-- Üst Bilgi Çubuğu (Mobil & TV uyumlu sade HUD) -->
       <header id="hud" class="calm-hud">
-        <div class="hud-stat">
-          <span class="hud-label">Parkur</span>
-          <span id="stage-val" class="hud-value">1</span>
-        </div>
-
-        <div class="hud-stat hud-progress">
-          <div class="progress-header">
-            <span class="hud-label">Yolculuk</span>
-            <span id="progress-text" class="hud-sub">0 / 12</span>
+        <div class="hud-stats-row">
+          <div class="hud-stat">
+            <span class="hud-label">Parkur</span>
+            <span id="stage-val" class="hud-value">1</span>
           </div>
-          <div class="progress-track">
-            <div id="progress-fill"></div>
+
+          <div class="hud-stat hud-progress">
+            <div class="progress-header">
+              <span class="hud-label">Yolculuk</span>
+              <span id="progress-text" class="hud-sub">0 / 12</span>
+            </div>
+            <div class="progress-track">
+              <div id="progress-fill"></div>
+            </div>
           </div>
-        </div>
 
-        <div class="hud-stat">
-          <span class="hud-label">Yıldız</span>
-          <span id="stars-val" class="hud-value hud-star-val">★ 0</span>
-        </div>
+          <div class="hud-stat">
+            <span class="hud-label">Yıldız</span>
+            <span id="stars-val" class="hud-value hud-star-val">★ 0</span>
+          </div>
 
-        <div class="hud-stat">
-          <span class="hud-label">Seri</span>
-          <span id="streak-val" class="hud-value hud-streak-val">0x</span>
-        </div>
+          <div class="hud-stat">
+            <span class="hud-label">Seri</span>
+            <span id="streak-val" class="hud-value hud-streak-val">0x</span>
+          </div>
 
-        <div class="hud-stat">
-          <span class="hud-label" id="hearts-label">Mod</span>
-          <span id="hearts-val" class="hud-value hud-mode-tag">Rahat</span>
+          <div class="hud-stat">
+            <span class="hud-label" id="hearts-label">Mod</span>
+            <span id="hearts-val" class="hud-value hud-mode-tag">Rahat</span>
+          </div>
         </div>
 
         <div class="hud-buttons">
-          <button id="btn-tv-mode" class="btn-icon btn-tv" type="button" title="TV Tam Ekran Modu">TV Tam Ekran</button>
+          <button id="btn-open-settings" class="btn-icon btn-settings-mobile" type="button" title="Ayarlar">⚙ Ayarlar</button>
+          <button id="btn-tv-mode" class="btn-icon btn-tv" type="button" title="TV Tam Ekran Modu">Tam Ekran</button>
           <button id="btn-pause" class="btn-icon" type="button" title="Duraklat" disabled>Duraklat</button>
-          <button id="btn-home" class="btn-icon" type="button" title="Ana Ekran">Ana Ekran</button>
+          <button id="btn-home" class="btn-icon" type="button" title="Ana Ekran">Menü</button>
         </div>
       </header>
 
@@ -128,37 +134,38 @@
         <div class="modal-card">
           <h1 class="main-title">Doğa Parkuru</h1>
           <p class="main-subtitle">
-            Kameradan 2 adım geri çekil, düz yolda ilerlerken engelleri aş, altın yıldızları topla ve Ayna Kapısı'ndaki hareketleri taklit et!
+            Kameradan 2 adım geri çekil; engelleri aş, yıldızları topla ve Ayna Kapısı'ndaki hareketleri taklit et!
           </p>
 
           <div id="hub-status" class="hub-badge status-connecting">Kamera bağlanıyor...</div>
+
+          <div class="welcome-actions">
+            <button id="btn-start" class="btn btn-primary btn-large" type="button">Parkura Başla</button>
+            <button id="btn-start-tv" class="btn btn-secondary btn-large" type="button">TV Tam Ekran Başlat</button>
+            <button id="btn-welcome-settings" class="btn btn-secondary btn-large btn-settings-mobile" type="button">⚙ Ayarlar & Kamera</button>
+          </div>
 
           <div class="moves-grid">
             <div class="move-card">
               <div class="move-symbol">◀ ▶</div>
               <h3>Sağa ve Sola</h3>
-              <p>Çitleri görünce açık şeride doğru adım at.</p>
+              <p>Açık şeride adım at.</p>
             </div>
             <div class="move-card">
               <div class="move-symbol">▲</div>
               <h3>Zıpla</h3>
-              <p>Yerdeki kütüklerin üzerinden zıplayarak geç.</p>
+              <p>Kütüklerin üstünden atla.</p>
             </div>
             <div class="move-card">
               <div class="move-symbol">▼</div>
               <h3>Eğil</h3>
-              <p>Üstteki dalların altından eğilerek geç.</p>
+              <p>Dalların altından geç.</p>
             </div>
             <div class="move-card">
               <div class="move-symbol">🪞</div>
               <h3>Ayna Kapısı</h3>
-              <p>Kapıdaki kol ve bacak duruşunu taklit et!</p>
+              <p>Kol ve bacak pozunu kopyala.</p>
             </div>
-          </div>
-
-          <div class="welcome-actions">
-            <button id="btn-start" class="btn btn-primary btn-large" type="button">Parkura Başla</button>
-            <button id="btn-start-tv" class="btn btn-secondary btn-large" type="button">TV Tam Ekran Başlat</button>
           </div>
         </div>
       </section>
@@ -170,7 +177,8 @@
           <p class="modal-desc">Hazır olduğunda parkura kaldığın yerden devam edebilirsin.</p>
           <div class="modal-actions">
             <button id="btn-resume" class="btn btn-primary" type="button">Devam Et</button>
-            <button id="btn-pause-home" class="btn btn-secondary" type="button">Ana Ekrana Dön</button>
+            <button id="btn-pause-settings" class="btn btn-secondary btn-settings-mobile" type="button">⚙ Ayarlar</button>
+            <button id="btn-pause-home" class="btn btn-secondary" type="button">Ana Ekran</button>
           </div>
         </div>
       </section>

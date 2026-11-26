@@ -1475,12 +1475,13 @@ export class ParkourEngine {
     if (!label) return;
 
     ctx.save();
-    ctx.font = '800 19px Nunito, sans-serif';
+    const isNarrow = w < 640;
+    ctx.font = `800 ${isNarrow ? 15 : 19}px Nunito, sans-serif`;
     const textW = ctx.measureText(label).width;
-    const pillW = Math.min(w - 40, textW + 46);
-    const pillH = 46;
+    const pillW = Math.min(w - 24, textW + (isNarrow ? 32 : 46));
+    const pillH = isNarrow ? 38 : 46;
     const px = (w - pillW) / 2;
-    const py = 84;
+    const py = isNarrow ? 114 : 84;
 
     ctx.fillStyle = bg;
     ctx.strokeStyle = border;
@@ -1498,10 +1499,10 @@ export class ParkourEngine {
   }
 
   drawStanceIndicator(ctx, w, h) {
-    const barW = 270;
-    const barH = 42;
+    const barW = Math.min(270, w - 24);
+    const barH = 40;
     const bx = (w - barW) / 2;
-    const by = h - barH - 18;
+    const by = h - barH - 14;
 
     ctx.save();
     ctx.fillStyle = 'rgba(250, 247, 240, 0.9)';

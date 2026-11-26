@@ -32,6 +32,11 @@ class ParkourApp {
     this.btnStart = document.getElementById('btn-start');
     this.btnStartTv = document.getElementById('btn-start-tv');
     this.btnTvMode = document.getElementById('btn-tv-mode');
+    this.btnOpenSettings = document.getElementById('btn-open-settings');
+    this.btnWelcomeSettings = document.getElementById('btn-welcome-settings');
+    this.btnPauseSettings = document.getElementById('btn-pause-settings');
+    this.btnCloseSettings = document.getElementById('btn-close-settings');
+    this.drawerBackdrop = document.getElementById('drawer-backdrop');
     this.btnPause = document.getElementById('btn-pause');
     this.btnHome = document.getElementById('btn-home');
     this.btnResume = document.getElementById('btn-resume');
@@ -88,8 +93,22 @@ class ParkourApp {
     });
 
     this.btnTvMode.addEventListener('click', () => {
+      this.setSettingsOpen(false);
       this.setTvMode(!this.isTvMode);
     });
+
+    [this.btnOpenSettings, this.btnWelcomeSettings, this.btnPauseSettings].forEach((btn) => {
+      if (btn) {
+        btn.addEventListener('click', () => this.setSettingsOpen(true));
+      }
+    });
+
+    if (this.btnCloseSettings) {
+      this.btnCloseSettings.addEventListener('click', () => this.setSettingsOpen(false));
+    }
+    if (this.drawerBackdrop) {
+      this.drawerBackdrop.addEventListener('click', () => this.setSettingsOpen(false));
+    }
 
     this.btnPause.addEventListener('click', () => {
       if (this.state === 'playing') {
@@ -214,6 +233,10 @@ class ParkourApp {
     window.addEventListener('resize', () => this.resizeCanvas());
   }
 
+  setSettingsOpen(open) {
+    document.body.classList.toggle('settings-open', !!open);
+  }
+
   /**
    * TV Tam Ekran Modu: sol ayar panelini gizler, kamerayı sol alt köşede küçük PiP yapar
    * ve mümkünse tarayıcı tam ekranını (Fullscreen) açar.
@@ -221,7 +244,7 @@ class ParkourApp {
   async setTvMode(enable) {
     this.isTvMode = !!enable;
     document.body.classList.toggle('tv-mode', this.isTvMode);
-    this.btnTvMode.textContent = this.isTvMode ? 'Ayarlar' : 'TV Tam Ekran';
+    this.btnTvMode.textContent = this.isTvMode ? 'Normal Ekran' : 'Tam Ekran';
 
     try {
       if (this.isTvMode) {
