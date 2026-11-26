@@ -722,7 +722,6 @@ export class ParkourEngine {
     if (this.isRunning && this.countdownTimer > 0) {
       this.drawPrepCountdown(ctx, w, h);
     } else if (this.isRunning) {
-      this.drawFixedActionCue(ctx, w);
       this.drawLaneDots(ctx, w, h);
     }
   }
@@ -1209,6 +1208,15 @@ export class ParkourEngine {
         ctx.lineTo(bl.x + width * 0.72, bl.y);
         ctx.stroke();
       }
+
+      // Engelin üzerinde açık şeridi gösteren sabit yön oku tabelası (yazısız!)
+      if (width > 38) {
+        const dir = obs.openLane < lane ? 'left' : 'right';
+        const signSize = Math.min(46, Math.max(20, width * 0.34));
+        const scx = (bl.x + br.x) * 0.5;
+        const scy = tl.y + height * 0.5;
+        this.drawObstacleArrowBadge(ctx, scx, scy, dir, signSize, '#d4962e');
+      }
     }
   }
 
@@ -1272,6 +1280,14 @@ export class ParkourEngine {
         ctx.fill();
       }
     }
+
+    // Zıplama engelinin tam ortasında yukarı yön oku tabelası (yazısız!)
+    if (width > 56) {
+      const signSize = Math.min(48, Math.max(22, height * 0.75));
+      const scx = (leftBase.x + rightBase.x) * 0.5;
+      const scy = leftTop.y - signSize * 0.55 - 4;
+      this.drawObstacleArrowBadge(ctx, scx, scy, 'up', signSize, '#df7f62');
+    }
   }
 
   drawDuckObstacle(ctx, obs, relZ) {
@@ -1325,6 +1341,14 @@ export class ParkourEngine {
         ctx.arc(lx, leftTop.y + beamH * 0.14, Math.max(4, beamH * 0.34), 0, Math.PI * 2);
         ctx.fill();
       }
+    }
+
+    // Eğilme kemerinin tam ortasında aşağı yön oku tabelası (yazısız!)
+    if (width > 56) {
+      const signSize = Math.min(48, Math.max(22, beamH * 0.68));
+      const scx = (leftBase.x + rightBase.x) * 0.5;
+      const scy = leftTop.y + beamH * 0.52;
+      this.drawObstacleArrowBadge(ctx, scx, scy, 'down', signSize, '#5e8e56');
     }
   }
 
@@ -1601,68 +1625,19 @@ export class ParkourEngine {
   }
 
   /**
-   * Yazısız, ekranda TAM SABİT (sağa sola kaymayan) büyük yön oku göstergesi
+   * Doğrudan engelin üzerine yerleşen yuvarlak/kare yön oku tabelası
    */
-  drawFixedActionCue(ctx, w) {
-    const upcoming = this.obstacles.find((o) => !o.resolved && o.z - this.distance > 1.0 && o.z - this.distance < 21);
-
-    let iconType = null; // 'up' | 'down' | 'left' | 'right' | 'check'
-    let color = '#5e8e56';
-    let bg = 'rgba(250, 247, 240, 0.94)';
-
-    if (upcoming) {
-      if (upcoming.type === 'jump') {
-        iconType = 'up';
-        color = '#df7f62';
-      } else if (upcoming.type === 'duck') {
-        iconType = 'down';
-        color = '#5e8e56';
-      } else if (upcoming.type === 'dodge') {
-        if (!upcoming.blockedLanes.includes(this.playerLane)) {
-          // Çocuk zaten açık şeritteyse yeşil onay!
-          iconType = 'check';
-          color = '#5e8e56';
-          bg = 'rgba(222, 239, 217, 0.95)';
-        } else if (upcoming.openLane < this.playerLane) {
-          iconType = 'left';
-          color = '#d4962e';
-        } else {
-          iconType = 'right';
-          color = '#d4962e';
-        }
-      } else if (upcoming.type === 'mirror' && upcoming.matched) {
-        iconType = 'check';
-        color = '#5e8e56';
-        bg = 'rgba(222, 239, 217, 0.95)';
-      }
-    } else if (this.feedbackTimer > 0 && this.feedbackIcon === 'ok') {
-      iconType = 'check';
-      color = '#5e8e56';
-      bg = 'rgba(222, 239, 217, 0.95)';
-    }
-
-    if (!iconType) return;
-
-    // Tam sabit orta-üst konum (hiç kaymaz!)
-    const size = w < 640 ? 64 : 78;
-    const cx = w * 0.5;
-    const cy = 64 + size * 0.5;
-
+  drawObstacleArrowBadge(ctx, cx, cy, dir, size, color) {
     ctx.save();
-    ctx.fillStyle = bg;
+    ctx.fillStyle = '#faf6ec';
     ctx.strokeStyle = color;
-    ctx.lineWidth = 3.5;
+    ctx.lineWidth = Math.max(2, size * 0.08);
     ctx.beginPath();
-    ctx.roundRect(cx - size / 2, cy - size / 2, size, size, 20);
+    ctx.roundRect(cx - size / 2, cy - size / 2, size, size, Math.max(6, size * 0.28));
     ctx.fill();
     ctx.stroke();
 
-    const iconR = size * 0.34;
-    if (iconType === 'check') {
-      this.drawCheckIcon(ctx, cx, cy, iconR, color);
-    } else {
-      this.drawArrowIcon(ctx, cx, cy, iconType, iconR, color);
-    }
+    this.drawArrowIcon(ctx, cx, cy, dir, size * 0.35, color);
     ctx.restore();
   }
 
