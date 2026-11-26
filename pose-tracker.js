@@ -198,7 +198,7 @@ export class PoseTracker {
   updateStatus(message, stateClass) {
     if (!this.statusElement) return;
     this.statusElement.textContent = message;
-    this.statusElement.className = `status-${stateClass}`;
+    this.statusElement.className = `status-pill status-${stateClass}`;
   }
 
   mirrorLandmark(lm) {

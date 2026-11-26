@@ -1,4 +1,4 @@
-/* Doğa Parkuru — Mobil, Tablet, TV ve Masaüstü Tam Uyumlu Mat Arayüz */
+/* Doğa Parkuru — Mobil-Öncelikli, Tek Kolon, Kesintisiz ve Sade Arayüz */
 
 :root {
   --bg-page: #ede7dc;
@@ -6,15 +6,12 @@
   --bg-card: #faf7f0;
   --border-soft: #d9cfc0;
   --text-main: #3d3730;
-  --text-muted: #70665a;
-  --sage: #6f9468;
-  --sage-hover: #5e8258;
-  --sage-soft: #e3ecdf;
-  --terracotta: #c97b63;
+  --text-muted: #6e6459;
+  --sage: #678f60;
+  --sage-hover: #567c50;
+  --sage-soft: #e2ecde;
   --ochre-soft: #f2e8d2;
   --ochre-text: #7a602d;
-  --radius-lg: 20px;
-  --radius-md: 14px;
 }
 
 * {
@@ -36,80 +33,32 @@ body {
   touch-action: manipulation;
 }
 
-#app-container {
-  display: flex;
-  flex-direction: row;
-  width: 100vw;
-  height: 100vh;
-  height: 100dvh;
-  padding: 12px;
-  gap: 12px;
+.hidden {
+  display: none !important;
 }
 
-.drawer-backdrop {
-  display: none;
+/* Gizli kamera yuvası (oyun içi kamera kapalıyken video akışı asla durmasın) */
+#camera-hidden-host {
   position: fixed;
-  inset: 0;
-  background: rgba(61, 55, 48, 0.42);
-  z-index: 35;
+  left: 0;
+  bottom: 0;
+  width: 2px;
+  height: 2px;
+  opacity: 0.01;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: -1;
 }
 
-body.settings-open .drawer-backdrop {
-  display: block;
-}
-
-/* ==========================================
-   SOL KAMERA & AYAR PANELİ (Masaüstü varsayılan)
-   ========================================== */
-.calm-panel {
-  width: 296px;
-  background: var(--bg-panel);
-  border: 1.5px solid var(--border-soft);
-  border-radius: var(--radius-lg);
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  flex-shrink: 0;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-.panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.panel-title {
-  font-size: 1rem;
-  font-weight: 800;
-  color: var(--text-main);
-}
-
-.btn-close-drawer {
-  display: none;
-  font-family: inherit;
-  font-size: 0.85rem;
-  font-weight: 800;
-  padding: 6px 12px;
-  border-radius: 10px;
-  border: 1.5px solid var(--border-soft);
-  background: var(--bg-card);
-  color: var(--text-main);
-  cursor: pointer;
-}
-
+/* Ortak kamera görüntü kutusu */
 .video-wrapper {
   position: relative;
   width: 100%;
-  aspect-ratio: 4 / 3;
-  border-radius: var(--radius-md);
+  height: 100%;
+  border-radius: 14px;
   overflow: hidden;
-  border: 1.5px solid var(--border-soft);
   background: #dfd8cb;
-  flex-shrink: 0;
+  border: 1.5px solid var(--border-soft);
 }
 
 #webcam {
@@ -117,6 +66,7 @@ body.settings-open .drawer-backdrop {
   height: 100%;
   object-fit: cover;
   transform: scaleX(-1);
+  display: block;
 }
 
 #camera-overlay {
@@ -128,13 +78,227 @@ body.settings-open .drawer-backdrop {
   pointer-events: none;
 }
 
-#camera-status,
-.hub-badge {
-  text-align: center;
-  font-size: 0.85rem;
-  font-weight: 700;
-  padding: 7px 12px;
+/* ==========================================
+   OYUN SAHNESİ (Her cihazda 100% tam ekran, temiz POV)
+   ========================================== */
+#game-stage {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  background: #cde2eb;
+  overflow: hidden;
+  z-index: 1;
+}
+
+#game-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Oyun içi ince, tek satırlık üst şerit (asla 2 satıra taşmaz) */
+.game-hud {
+  position: fixed;
+  top: max(8px, env(safe-area-inset-top));
+  left: max(8px, env(safe-area-inset-left));
+  right: max(8px, env(safe-area-inset-right));
+  height: 44px;
+  z-index: 10;
+  background: rgba(250, 247, 240, 0.88);
+  border: 1.5px solid var(--border-soft);
+  border-radius: 14px;
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hud-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.hud-chip {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--text-main);
+  background: var(--bg-panel);
+  border: 1px solid var(--border-soft);
+  border-radius: 9px;
+  padding: 3px 7px;
+  white-space: nowrap;
+}
+
+.hud-star {
+  color: #a87616;
+}
+
+.hud-streak {
+  color: #be6045;
+}
+
+.hud-hearts {
+  color: var(--sage);
+}
+
+.hud-progress-wrap {
+  flex: 1;
+  min-width: 36px;
+}
+
+.progress-track {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: #e3dacb;
+  overflow: hidden;
+}
+
+#progress-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--sage);
+  border-radius: 999px;
+  transition: width 0.2s ease;
+}
+
+.hud-right {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.hud-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1.5px solid var(--border-soft);
+  background: var(--bg-card);
+  color: var(--text-main);
+  font-size: 0.95rem;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.hud-btn.active {
+  background: var(--sage);
+  border-color: var(--sage);
+  color: #faf7f0;
+}
+
+/* Oyun içi opsiyonel küçük kamera köşesi */
+.pip-slot {
+  position: fixed;
+  left: max(10px, env(safe-area-inset-left));
+  bottom: max(62px, env(safe-area-inset-bottom));
+  width: 120px;
+  aspect-ratio: 4 / 3;
+  z-index: 11;
   border-radius: 12px;
+  box-shadow: 0 6px 16px rgba(61, 55, 48, 0.16);
+}
+
+@media (min-width: 768px) {
+  .pip-slot {
+    width: 168px;
+    bottom: 16px;
+    left: 16px;
+  }
+}
+
+/* ==========================================
+   TAM EKRAN KAYDIRILABİLİR MENÜ VE AYAR SAYFALARI
+   (Hiçbir cihazda hiçbir düğme ekran dışında kalmaz!)
+   ========================================== */
+.full-screen-page {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  z-index: 30;
+  background: var(--bg-page);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: max(12px, env(safe-area-inset-top)) 14px max(28px, env(safe-area-inset-bottom));
+}
+
+.modal-backdrop {
+  background: rgba(237, 231, 220, 0.88);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.page-sheet {
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sheet-header {
+  text-align: center;
+  padding-top: 4px;
+}
+
+.main-title {
+  font-size: clamp(1.6rem, 5vw, 2.2rem);
+  font-weight: 800;
+  color: var(--text-main);
+  margin-bottom: 4px;
+}
+
+.main-subtitle {
+  font-size: 0.92rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* Ana Menü içindeki kamera önizleme kartı */
+.menu-camera-card {
+  background: var(--bg-card);
+  border: 1.5px solid var(--border-soft);
+  border-radius: 18px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.camera-slot-menu {
+  width: 100%;
+  max-width: 340px;
+  aspect-ratio: 4 / 3;
+  max-height: 30dvh;
+  margin: 0 auto;
+}
+
+.menu-camera-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.status-pill {
+  flex: 1;
+  text-align: center;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 6px 10px;
+  border-radius: 10px;
 }
 
 .status-connecting {
@@ -152,266 +316,57 @@ body.settings-open .drawer-backdrop {
   color: #8c4b3a;
 }
 
-/* Ayar Kutuları */
-.settings-group {
-  background: var(--bg-card);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-md);
-  padding: 11px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.divider-line {
-  height: 1px;
-  background: #e6dfd2;
-  margin: 2px 0;
-}
-
-.setting-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.setting-label {
-  font-size: 0.88rem;
+.btn-mini {
+  font-family: inherit;
+  font-size: 0.8rem;
   font-weight: 800;
-  color: var(--text-main);
-}
-
-.setting-value {
-  font-size: 0.88rem;
-  font-weight: 800;
-  color: var(--sage);
-}
-
-.setting-hint {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-}
-
-.slider-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.slider-tag {
-  font-size: 0.76rem;
-  font-weight: 700;
-  color: var(--text-muted);
-}
-
-input[type="range"]#speed-slider {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 100%;
-  height: 8px;
-  border-radius: 999px;
-  background: #dfd6c7;
-  outline: none;
-}
-
-input[type="range"]#speed-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: var(--sage);
-  border: 2px solid #faf7f0;
-  cursor: pointer;
-}
-
-.toggle-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  cursor: pointer;
-}
-
-.toggle-row input[type="checkbox"] {
-  width: 22px;
-  height: 22px;
-  accent-color: var(--sage);
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.sidebar-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.sidebar-row-btns {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.sidebar-row-btns .btn {
-  padding: 10px 6px;
-  font-size: 0.83rem;
-}
-
-.keyboard-help {
-  margin-top: auto;
-  background: #f1ece2;
-  border-radius: 12px;
-  padding: 9px 11px;
-  font-size: 0.74rem;
-  color: var(--text-muted);
-  line-height: 1.45;
-}
-
-.help-title {
-  font-weight: 800;
-  color: var(--text-main);
-  margin-bottom: 2px;
-}
-
-/* ==========================================
-   ANA OYUN ALANI & HUD
-   ========================================== */
-#game-container {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  position: relative;
-  border-radius: var(--radius-lg);
-  overflow: hidden;
+  padding: 6px 10px;
+  border-radius: 10px;
   border: 1.5px solid var(--border-soft);
-  background: #cde2eb;
-}
-
-#game-canvas {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-
-.calm-hud {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  right: 10px;
-  z-index: 10;
-  background: rgba(250, 247, 240, 0.93);
-  border: 1.5px solid var(--border-soft);
-  border-radius: 16px;
-  padding: 8px 12px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.hud-stats-row {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  flex: 1;
-  min-width: 240px;
-}
-
-.hud-stat {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  min-width: 46px;
-}
-
-.hud-progress {
-  flex: 1;
-  align-items: stretch;
-  min-width: 90px;
-}
-
-.progress-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin-bottom: 4px;
-  gap: 6px;
-}
-
-.hud-label {
-  font-size: 0.68rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--text-muted);
-}
-
-.hud-sub {
-  font-size: 0.74rem;
-  font-weight: 700;
+  background: var(--bg-panel);
   color: var(--text-main);
-}
-
-.hud-value {
-  font-size: 1.1rem;
-  font-weight: 800;
-  color: var(--text-main);
+  cursor: pointer;
   white-space: nowrap;
 }
 
-.hud-mode-tag {
-  font-size: 0.88rem;
-  color: var(--sage);
-}
-
-.hud-star-val {
-  color: #b88420;
-}
-
-.hud-streak-val {
-  color: #c96c50;
-}
-
-.progress-track {
-  width: 100%;
-  height: 9px;
-  border-radius: 999px;
-  background: #e3dacb;
-  overflow: hidden;
-}
-
-#progress-fill {
-  height: 100%;
-  width: 0%;
-  background: var(--sage);
-  border-radius: 999px;
-  transition: width 0.2s ease;
-}
-
-.hud-buttons {
+/* Ana düğmeler */
+.primary-actions {
   display: flex;
-  gap: 6px;
-  flex-shrink: 0;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 10px;
 }
 
-/* Masaüstünde mobil ayarlar düğmesini gizle (sol panel zaten açık) */
-.btn-settings-mobile {
-  display: none;
+.secondary-actions-row,
+.settings-row-btns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
 }
 
-/* Düğmeler */
 .btn {
   font-family: inherit;
-  font-size: 0.94rem;
+  font-size: 0.96rem;
   font-weight: 800;
-  padding: 11px 18px;
+  padding: 12px 16px;
   border-radius: 14px;
   border: 1.5px solid transparent;
   cursor: pointer;
-  transition: background-color 0.2s ease, border-color 0.2s ease;
+  text-align: center;
+}
+
+.btn-xl {
+  font-size: 1.12rem;
+  padding: 15px 20px;
+  border-radius: 16px;
+}
+
+.btn-compact {
+  padding: 8px 14px;
+  font-size: 0.9rem;
+}
+
+.btn-full {
+  width: 100%;
 }
 
 .btn-primary {
@@ -419,7 +374,7 @@ input[type="range"]#speed-slider::-webkit-slider-thumb {
   color: #faf7f0;
 }
 
-.btn-primary:hover:not(:disabled) {
+.btn-primary:active {
   background: var(--sage-hover);
 }
 
@@ -429,390 +384,233 @@ input[type="range"]#speed-slider::-webkit-slider-thumb {
   border-color: var(--border-soft);
 }
 
-.btn-secondary:hover:not(:disabled) {
-  background: #eee7da;
+.btn-secondary:active {
+  background: #e9e1d3;
 }
 
-.btn-large {
-  font-size: 1.02rem;
-  padding: 13px 22px;
-  border-radius: 15px;
+/* Hareket özeti (2x2 kompakt kartlar) */
+.moves-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
 }
 
-.btn-icon {
-  font-family: inherit;
-  font-size: 0.8rem;
-  font-weight: 800;
-  padding: 8px 11px;
-  border-radius: 11px;
-  border: 1.5px solid var(--border-soft);
+.move-item {
   background: var(--bg-card);
-  color: var(--text-main);
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.btn-icon:hover:not(:disabled) {
-  background: #eee7da;
-}
-
-.btn-tv {
-  background: var(--sage-soft);
-  border-color: #b7cfb1;
-  color: #3a5e34;
-}
-
-.btn-icon:disabled,
-.btn:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-/* ==========================================
-   TV TAM EKRAN MODU (Her cihazda tam ekran + küçük köşe kamerası)
-   ========================================== */
-body.tv-mode #app-container {
-  padding: 0;
-  gap: 0;
-}
-
-body.tv-mode #game-container {
-  border-radius: 0;
-  border: none;
-}
-
-body.tv-mode:not(.settings-open) #camera-container {
-  position: fixed;
-  left: 14px;
-  bottom: 14px;
-  width: 168px;
-  height: auto;
-  padding: 5px;
-  gap: 0;
-  z-index: 12; /* Modalların (20) altında, oyunun üstünde */
+  border: 1.5px solid var(--border-soft);
   border-radius: 14px;
-  background: rgba(250, 247, 240, 0.9);
-  box-shadow: 0 6px 18px rgba(61, 55, 48, 0.14);
-  overflow: hidden;
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-body.tv-mode:not(.settings-open) #camera-container > *:not(.video-wrapper) {
-  display: none;
-}
-
-body.tv-mode:not(.settings-open) #camera-container .video-wrapper {
+.move-icon {
+  width: 36px;
+  height: 36px;
   border-radius: 10px;
-}
-
-body.tv-mode .btn-tv {
-  background: var(--sage);
-  border-color: var(--sage);
-  color: #faf7f0;
-}
-
-body.tv-mode .btn-settings-mobile {
+  background: var(--sage-soft);
+  color: #466840;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  font-size: 1rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.move-item strong {
+  display: block;
+  font-size: 0.88rem;
+  color: var(--text-main);
+}
+
+.move-item small {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
 }
 
 /* ==========================================
-   MODAL EKRANLAR (Kaydırılabilir — asla tuş kesilmez!)
+   AYARLAR SAYFASI
    ========================================== */
-.screen-overlay {
-  position: absolute;
-  inset: 0;
-  z-index: 20;
-  background: rgba(237, 231, 220, 0.84);
+.settings-sheet {
+  padding-bottom: 24px;
+}
+
+.sticky-bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--bg-page);
+  padding: 6px 0 10px;
   display: flex;
-  padding: 16px;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  transition: opacity 0.22s ease, visibility 0.22s ease;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1.5px solid var(--border-soft);
 }
 
-.screen-overlay.hidden {
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-}
-
-.screen-overlay.active {
-  opacity: 1;
-  visibility: visible;
-  pointer-events: auto;
-}
-
-.modal-card {
-  margin: auto; /* Sığınca ortalar, sığmazsa üstten kesilmeden kayar! */
-  width: 100%;
-  max-width: 720px;
-  background: var(--bg-card);
-  border: 2px solid var(--border-soft);
-  border-radius: 24px;
-  padding: 24px 26px;
-  text-align: center;
-  box-shadow: 0 10px 28px rgba(61, 55, 48, 0.08);
-}
-
-.modal-small {
-  max-width: 460px;
-}
-
-.main-title {
-  font-size: clamp(1.5rem, 3.6vw, 2.15rem);
+.sticky-bar h2 {
+  font-size: 1.15rem;
   font-weight: 800;
-  color: var(--text-main);
-  margin-bottom: 8px;
 }
 
-.main-subtitle,
-.modal-desc {
-  font-size: clamp(0.88rem, 2vw, 1rem);
-  color: var(--text-muted);
-  line-height: 1.45;
-  margin-bottom: 14px;
-}
-
-.hub-badge {
-  display: inline-block;
-  margin-bottom: 16px;
-  padding: 7px 16px;
-}
-
-.welcome-actions {
+.settings-body {
   display: flex;
-  justify-content: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 18px;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.moves-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
-}
-
-.move-card {
-  background: var(--bg-panel);
+.setting-card {
+  background: var(--bg-card);
   border: 1.5px solid var(--border-soft);
   border-radius: 16px;
-  padding: 12px 8px;
+  padding: 14px;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 5px;
+  gap: 10px;
 }
 
-.move-symbol {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  background: var(--sage-soft);
-  color: #466840;
+.setting-top {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  justify-content: center;
-  font-size: 1.1rem;
-  font-weight: 800;
 }
 
-.move-card h3 {
-  font-size: 0.9rem;
+.setting-title {
+  font-size: 0.94rem;
   font-weight: 800;
   color: var(--text-main);
 }
 
-.move-card p {
-  font-size: 0.76rem;
-  color: var(--text-muted);
-  line-height: 1.32;
-}
-
-.summary-row {
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-  margin-bottom: 20px;
-}
-
-.summary-box {
-  flex: 1;
-  background: var(--bg-panel);
-  border: 1.5px solid var(--border-soft);
-  border-radius: 14px;
-  padding: 12px 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.summary-label {
-  font-size: 0.74rem;
-  font-weight: 700;
-  color: var(--text-muted);
-}
-
-.summary-value {
-  font-size: 1.5rem;
+.setting-val {
+  font-size: 0.95rem;
   font-weight: 800;
   color: var(--sage);
 }
 
-.modal-actions {
+.setting-desc {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.slider-row {
   display: flex;
-  justify-content: center;
+  align-items: center;
   gap: 10px;
-  flex-wrap: wrap;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-muted);
 }
 
-/* Ayarlar Çekmecesi Açıkken (Mobil/Tablet/TV Modu) */
-body.settings-open #camera-container {
-  position: fixed;
-  top: 12px;
-  left: 12px;
-  bottom: 12px;
-  width: min(330px, calc(100vw - 24px));
-  height: auto;
-  z-index: 40;
+input[type="range"]#speed-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 9px;
+  border-radius: 999px;
+  background: #dfd6c7;
+  outline: none;
+}
+
+input[type="range"]#speed-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--sage);
+  border: 2px solid #faf7f0;
+  cursor: pointer;
+}
+
+.toggle-item {
   display: flex;
-  padding: 14px;
-  gap: 10px;
-  border-radius: 20px;
-  box-shadow: 0 14px 36px rgba(61, 55, 48, 0.24);
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
 }
 
-body.settings-open #camera-container > * {
-  display: flex;
+.toggle-item input[type="checkbox"] {
+  width: 24px;
+  height: 24px;
+  accent-color: var(--sage);
+  flex-shrink: 0;
 }
 
-body.settings-open #camera-container .video-wrapper,
-body.settings-open #camera-container #camera-status {
-  display: block;
-}
-
-body.settings-open .btn-close-drawer {
-  display: inline-block;
-}
-
-/* Dokunmatik cihazlarda klavye ipucunu gizle */
-@media (pointer: coarse) {
-  .keyboard-help {
-    display: none !important;
-  }
+.sep {
+  height: 1px;
+  background: #e6dfd2;
 }
 
 /* ==========================================
-   TABLET & MOBİL DÜZENİ (<= 1080px veya kısa yatay ekranlar)
-   Oyun her zaman tam ekranı doldurur; Ayarlar tek tuşla çekmece olarak açılır!
+   MİNİ MODALLAR (Mola / Bitti / Tekrar Dene)
    ========================================== */
-@media (max-width: 1080px), (max-height: 640px) {
-  #app-container {
-    padding: 0;
-    gap: 0;
-  }
-
-  #game-container {
-    border-radius: 0;
-    border: none;
-  }
-
-  .btn-settings-mobile {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  /* Ayarlar kapalıyken kamera sol alt köşede küçük PiP olarak durur */
-  body:not(.settings-open) #camera-container {
-    position: fixed;
-    left: 12px;
-    bottom: 12px;
-    width: 132px;
-    height: auto;
-    padding: 4px;
-    gap: 0;
-    z-index: 12;
-    border-radius: 12px;
-    background: rgba(250, 247, 240, 0.9);
-    box-shadow: 0 4px 14px rgba(61, 55, 48, 0.14);
-    overflow: hidden;
-  }
-
-  body:not(.settings-open) #camera-container > *:not(.video-wrapper) {
-    display: none;
-  }
-
-  body:not(.settings-open) #camera-container .video-wrapper {
-    border-radius: 9px;
-  }
-
-  .calm-hud {
-    top: 8px;
-    left: 8px;
-    right: 8px;
-    padding: 7px 10px;
-    gap: 8px;
-  }
-
-  .hud-stats-row {
-    gap: 10px;
-    min-width: 180px;
-  }
-
-  .hud-value {
-    font-size: 1rem;
-  }
-
-  .btn-icon {
-    font-size: 0.78rem;
-    padding: 7px 9px;
-  }
+.mini-modal {
+  margin: auto;
+  width: 100%;
+  max-width: 420px;
+  background: var(--bg-card);
+  border: 2px solid var(--border-soft);
+  border-radius: 22px;
+  padding: 24px 20px;
+  text-align: center;
+  box-shadow: 0 10px 28px rgba(61, 55, 48, 0.1);
 }
 
-/* Telefonlar ve dikey dar ekranlar */
-@media (max-width: 640px) {
-  .modal-card {
-    padding: 18px 14px;
-    border-radius: 20px;
-  }
+.mini-modal h2 {
+  font-size: 1.45rem;
+  margin-bottom: 8px;
+}
 
-  .welcome-actions {
-    flex-direction: column;
-    align-items: stretch;
-  }
+.mini-modal p {
+  font-size: 0.94rem;
+  color: var(--text-muted);
+  margin-bottom: 18px;
+}
 
-  .welcome-actions .btn-large {
-    width: 100%;
-    padding: 12px 16px;
-    font-size: 0.98rem;
-  }
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
 
-  .moves-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
-  }
+.summary-cell {
+  background: var(--bg-panel);
+  border: 1.5px solid var(--border-soft);
+  border-radius: 14px;
+  padding: 10px 6px;
+}
 
-  .move-card {
-    padding: 10px 6px;
-  }
+.summary-cell span {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 700;
+}
 
-  .hud-buttons {
-    width: 100%;
-    justify-content: space-between;
-  }
+.summary-cell strong {
+  display: block;
+  font-size: 1.35rem;
+  color: var(--sage);
+  font-weight: 800;
+}
 
-  .hud-buttons .btn-icon {
-    flex: 1;
-    text-align: center;
-    padding: 7px 4px;
-    font-size: 0.74rem;
-  }
+.modal-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
 
-  body:not(.settings-open) #camera-container {
-    width: 104px;
-    left: 8px;
-    bottom: 66px; /* Alttaki Sol/Orta/Sağ çubuğunun üstünde dursun */
+/* Çok dar telefon ekranlarında ekstra temiz HUD */
+@media (max-width: 460px) {
+  .hud-streak {
+    display: none;
+  }
+  .hud-chip {
+    font-size: 0.76rem;
+    padding: 3px 6px;
   }
 }

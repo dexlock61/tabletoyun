@@ -1476,12 +1476,12 @@ export class ParkourEngine {
 
     ctx.save();
     const isNarrow = w < 640;
-    ctx.font = `800 ${isNarrow ? 15 : 19}px Nunito, sans-serif`;
+    ctx.font = `800 ${isNarrow ? 15 : 18}px Nunito, sans-serif`;
     const textW = ctx.measureText(label).width;
-    const pillW = Math.min(w - 24, textW + (isNarrow ? 32 : 46));
-    const pillH = isNarrow ? 38 : 46;
+    const pillW = Math.min(w - 24, textW + (isNarrow ? 30 : 42));
+    const pillH = isNarrow ? 36 : 42;
     const px = (w - pillW) / 2;
-    const py = isNarrow ? 114 : 84;
+    const py = 60;
 
     ctx.fillStyle = bg;
     ctx.strokeStyle = border;

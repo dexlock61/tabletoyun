@@ -9,230 +9,241 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=5">
 
   <!-- MediaPipe Pose CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
 </head>
 <body>
-  <div id="drawer-backdrop" class="drawer-backdrop"></div>
+  <!-- Arka planda kameranın akışını kesmemek için gizli yuva (oyun içi önizleme kapalıyken) -->
+  <div id="camera-hidden-host" aria-hidden="true"></div>
 
-  <div id="app-container">
-    <!-- Sol Panel: Kamera Önizleme ve Ayarlar (Mobil/Tablet ve TV Modunda açılır çekmece + köşe önizleme) -->
-    <aside id="camera-container" class="calm-panel">
-      <div class="panel-header">
-        <span class="panel-title">Kamera ve Ayarlar</span>
-        <button id="btn-close-settings" class="btn-close-drawer" type="button" aria-label="Kapat">✕ Kapat</button>
+  <!-- Tek ve ortak kamera önizleme kutusu (ekranlar arasında temizce taşınır) -->
+  <div id="camera-box" class="video-wrapper">
+    <video id="webcam" autoplay playsinline muted></video>
+    <canvas id="camera-overlay"></canvas>
+  </div>
+
+  <!-- Tam Ekran POV Oyun Sahnesi -->
+  <main id="game-stage">
+    <canvas id="game-canvas"></canvas>
+
+    <!-- İnce, tek satırlık sade oyun içi üst bar (sadece oynarken görünür) -->
+    <header id="game-hud" class="game-hud hidden">
+      <div class="hud-left">
+        <span class="hud-chip" id="stage-val">P1</span>
+        <span class="hud-chip hud-star" id="stars-val">★ 0</span>
+        <span class="hud-chip hud-streak" id="streak-val">0x</span>
+        <span class="hud-chip hud-hearts" id="hearts-val">Rahat</span>
       </div>
 
-      <div class="video-wrapper">
-        <video id="webcam" autoplay playsinline muted></video>
-        <canvas id="camera-overlay"></canvas>
-      </div>
-
-      <div id="camera-status" class="status-connecting">Kamera hazırlanıyor...</div>
-
-      <div class="settings-group">
-        <div class="setting-row">
-          <label for="speed-slider" class="setting-label">Koşu Hızı</label>
-          <span id="speed-value" class="setting-value">1.0x</span>
+      <div class="hud-progress-wrap">
+        <div class="progress-track">
+          <div id="progress-fill"></div>
         </div>
-        <div class="slider-row">
-          <span class="slider-tag">Yavaş</span>
-          <input type="range" id="speed-slider" min="0.6" max="1.6" step="0.1" value="1.0">
-          <span class="slider-tag">Hızlı</span>
+      </div>
+
+      <div class="hud-right">
+        <button id="btn-toggle-pip" class="hud-btn" type="button" title="Kamera Önizleme">📷</button>
+        <button id="btn-fullscreen" class="hud-btn" type="button" title="Tam Ekran">⛶</button>
+        <button id="btn-hud-settings" class="hud-btn" type="button" title="Ayarlar">⚙</button>
+        <button id="btn-pause" class="hud-btn" type="button" title="Duraklat">⏸</button>
+      </div>
+    </header>
+
+    <!-- İsteğe bağlı oyun içi küçük kamera köşesi (varsayılan kapalı, 📷 ile açılır) -->
+    <div id="pip-camera-slot" class="pip-slot hidden"></div>
+  </main>
+
+  <!-- 1. ANA MENÜ (Tek kolon, tamamen kaydırılabilir, telefon + tablet + PC tam uyumlu) -->
+  <section id="screen-welcome" class="full-screen-page active">
+    <div class="page-sheet">
+      <div class="sheet-header">
+        <h1 class="main-title">Doğa Parkuru</h1>
+        <p class="main-subtitle">Kameradan 2 adım geri çekil, engelleri aş ve Ayna Kapısı'ndaki hareketleri taklit et!</p>
+      </div>
+
+      <!-- Canlı kamera önizleme alanı (Ana Menü içi) -->
+      <div class="menu-camera-card">
+        <div id="welcome-camera-slot" class="camera-slot-menu"></div>
+        <div class="menu-camera-bar">
+          <span id="camera-status" class="status-pill status-connecting">Kamera hazırlanıyor...</span>
+          <button id="btn-quick-switch-cam" class="btn-mini" type="button">🔄 Kamera Çevir</button>
         </div>
       </div>
 
-      <div class="settings-group settings-toggles">
-        <label class="toggle-row" for="calm-mode-toggle">
-          <div>
-            <div class="setting-label">Rahat Mod</div>
-            <div class="setting-hint">Can bitmeden oynama</div>
-          </div>
-          <input type="checkbox" id="calm-mode-toggle" checked>
-        </label>
-
-        <div class="divider-line"></div>
-
-        <label class="toggle-row" for="tablet-speed-toggle">
-          <div>
-            <div class="setting-label">Tablet Hız Modu</div>
-            <div class="setting-hint">Daha akıcı ve hafif takip</div>
-          </div>
-          <input type="checkbox" id="tablet-speed-toggle">
-        </label>
+      <!-- Ana Aksiyon Düğmeleri -->
+      <div class="primary-actions">
+        <button id="btn-start" class="btn btn-primary btn-xl" type="button">▶ Parkura Başla</button>
+        <div class="secondary-actions-row">
+          <button id="btn-start-tv" class="btn btn-secondary" type="button">⛶ Tam Ekran Başlat</button>
+          <button id="btn-welcome-settings" class="btn btn-secondary" type="button">⚙ Ayarlar</button>
+        </div>
       </div>
 
-      <div class="sidebar-actions">
-        <div class="sidebar-row-btns">
+      <!-- Hareket Özeti -->
+      <div class="moves-grid">
+        <div class="move-item">
+          <span class="move-icon">◀ ▶</span>
+          <div>
+            <strong>Sağa / Sola</strong>
+            <small>Açık şeride geç</small>
+          </div>
+        </div>
+        <div class="move-item">
+          <span class="move-icon">▲</span>
+          <div>
+            <strong>Zıpla</strong>
+            <small>Kütükten atla</small>
+          </div>
+        </div>
+        <div class="move-item">
+          <span class="move-icon">▼</span>
+          <div>
+            <strong>Eğil</strong>
+            <small>Dalın altından geç</small>
+          </div>
+        </div>
+        <div class="move-item">
+          <span class="move-icon">🪞</span>
+          <div>
+            <strong>Ayna Kapısı</strong>
+            <small>Kol ve bacak pozu</small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. AYARLAR SAYFASI (Tam ekran kaydırılabilir, üstte sabit Kapat düğmesi) -->
+  <section id="screen-settings" class="full-screen-page hidden">
+    <div class="page-sheet settings-sheet">
+      <div class="sticky-bar">
+        <h2>⚙ Ayarlar ve Kamera</h2>
+        <button id="btn-close-settings" class="btn btn-primary btn-compact" type="button">✓ Tamam</button>
+      </div>
+
+      <div class="settings-body">
+        <div id="settings-camera-slot" class="camera-slot-menu"></div>
+
+        <div class="settings-row-btns">
           <button id="btn-switch-cam" class="btn btn-secondary" type="button">Kamera: Ön</button>
           <button id="btn-recalibrate" class="btn btn-secondary" type="button">Boyu Hizala</button>
         </div>
-        <div class="sidebar-row-btns">
+
+        <div class="setting-card">
+          <div class="setting-top">
+            <label for="speed-slider" class="setting-title">Koşu Hızı</label>
+            <span id="speed-value" class="setting-val">1.0x</span>
+          </div>
+          <div class="slider-row">
+            <span>Yavaş</span>
+            <input type="range" id="speed-slider" min="0.6" max="1.6" step="0.1" value="1.0">
+            <span>Hızlı</span>
+          </div>
+        </div>
+
+        <div class="setting-card">
+          <label class="toggle-item" for="calm-mode-toggle">
+            <div>
+              <div class="setting-title">Rahat Mod</div>
+              <div class="setting-desc">Can bitmeden sakin oynama</div>
+            </div>
+            <input type="checkbox" id="calm-mode-toggle" checked>
+          </label>
+
+          <div class="sep"></div>
+
+          <label class="toggle-item" for="tablet-speed-toggle">
+            <div>
+              <div class="setting-title">Tablet / Telefon Hız Modu</div>
+              <div class="setting-desc">Daha akıcı ve hafif kamera takibi</div>
+            </div>
+            <input type="checkbox" id="tablet-speed-toggle">
+          </label>
+
+          <div class="sep"></div>
+
+          <label class="toggle-item" for="pip-toggle">
+            <div>
+              <div class="setting-title">Oyun İçi Kamera Önizleme</div>
+              <div class="setting-desc">Koşarken sol altta küçük kamera göster</div>
+            </div>
+            <input type="checkbox" id="pip-toggle">
+          </label>
+        </div>
+
+        <div class="settings-row-btns">
           <button id="btn-mute" class="btn btn-secondary" type="button">Ses: Açık</button>
           <button id="btn-music" class="btn btn-secondary" type="button">Müzik: Açık</button>
         </div>
+
+        <button id="btn-settings-home" class="btn btn-secondary btn-full hidden" type="button">Ana Menüye Dön</button>
       </div>
+    </div>
+  </section>
 
-      <div class="keyboard-help">
-        <div class="help-title">Klavye ile Test (İsteğe Bağlı)</div>
-        <p>◀ / ▶ Şerit &nbsp;•&nbsp; ▲ / Boşluk Zıpla &nbsp;•&nbsp; ▼ Eğil</p>
-        <p>M Tuşu: Yaklaşan Ayna Kapısını eşleştir</p>
+  <!-- 3. DURAKLATMA EKRANI -->
+  <section id="screen-pause" class="full-screen-page modal-backdrop hidden">
+    <div class="mini-modal">
+      <h2>Kısa Bir Mola</h2>
+      <p>Hazır olduğunda kaldığın yerden devam edebilirsin.</p>
+      <div class="modal-stack">
+        <button id="btn-resume" class="btn btn-primary btn-xl" type="button">▶ Devam Et</button>
+        <button id="btn-pause-settings" class="btn btn-secondary" type="button">⚙ Ayarlar</button>
+        <button id="btn-pause-home" class="btn btn-secondary" type="button">Ana Menü</button>
       </div>
-    </aside>
+    </div>
+  </section>
 
-    <!-- Sağ Alan: Birinci Şahıs (POV) Parkur Sahnesi -->
-    <main id="game-container">
-      <!-- Üst Bilgi Çubuğu (Mobil & TV uyumlu sade HUD) -->
-      <header id="hud" class="calm-hud">
-        <div class="hud-stats-row">
-          <div class="hud-stat">
-            <span class="hud-label">Parkur</span>
-            <span id="stage-val" class="hud-value">1</span>
-          </div>
-
-          <div class="hud-stat hud-progress">
-            <div class="progress-header">
-              <span class="hud-label">Yolculuk</span>
-              <span id="progress-text" class="hud-sub">0 / 12</span>
-            </div>
-            <div class="progress-track">
-              <div id="progress-fill"></div>
-            </div>
-          </div>
-
-          <div class="hud-stat">
-            <span class="hud-label">Yıldız</span>
-            <span id="stars-val" class="hud-value hud-star-val">★ 0</span>
-          </div>
-
-          <div class="hud-stat">
-            <span class="hud-label">Seri</span>
-            <span id="streak-val" class="hud-value hud-streak-val">0x</span>
-          </div>
-
-          <div class="hud-stat">
-            <span class="hud-label" id="hearts-label">Mod</span>
-            <span id="hearts-val" class="hud-value hud-mode-tag">Rahat</span>
-          </div>
+  <!-- 4. PARKUR TAMAMLANDI EKRANI -->
+  <section id="screen-complete" class="full-screen-page modal-backdrop hidden">
+    <div class="mini-modal">
+      <h2>Harikasın! Parkuru Bitirdin</h2>
+      <p>Çok güzel hareket ettin. Bir sonraki parkura geçmeye hazır mısın?</p>
+      <div class="summary-grid">
+        <div class="summary-cell">
+          <span>Parkur</span>
+          <strong id="complete-stage">1</strong>
         </div>
-
-        <div class="hud-buttons">
-          <button id="btn-open-settings" class="btn-icon btn-settings-mobile" type="button" title="Ayarlar">⚙ Ayarlar</button>
-          <button id="btn-tv-mode" class="btn-icon btn-tv" type="button" title="TV Tam Ekran Modu">Tam Ekran</button>
-          <button id="btn-pause" class="btn-icon" type="button" title="Duraklat" disabled>Duraklat</button>
-          <button id="btn-home" class="btn-icon" type="button" title="Ana Ekran">Menü</button>
+        <div class="summary-cell">
+          <span>Yıldız</span>
+          <strong id="complete-stars">★ 0</strong>
         </div>
-      </header>
-
-      <!-- POV Oyun Alanı -->
-      <canvas id="game-canvas"></canvas>
-
-      <!-- Karşılama Ekranı -->
-      <section id="screen-welcome" class="screen-overlay active">
-        <div class="modal-card">
-          <h1 class="main-title">Doğa Parkuru</h1>
-          <p class="main-subtitle">
-            Kameradan 2 adım geri çekil; engelleri aş, yıldızları topla ve Ayna Kapısı'ndaki hareketleri taklit et!
-          </p>
-
-          <div id="hub-status" class="hub-badge status-connecting">Kamera bağlanıyor...</div>
-
-          <div class="welcome-actions">
-            <button id="btn-start" class="btn btn-primary btn-large" type="button">Parkura Başla</button>
-            <button id="btn-start-tv" class="btn btn-secondary btn-large" type="button">TV Tam Ekran Başlat</button>
-            <button id="btn-welcome-settings" class="btn btn-secondary btn-large btn-settings-mobile" type="button">⚙ Ayarlar & Kamera</button>
-          </div>
-
-          <div class="moves-grid">
-            <div class="move-card">
-              <div class="move-symbol">◀ ▶</div>
-              <h3>Sağa ve Sola</h3>
-              <p>Açık şeride adım at.</p>
-            </div>
-            <div class="move-card">
-              <div class="move-symbol">▲</div>
-              <h3>Zıpla</h3>
-              <p>Kütüklerin üstünden atla.</p>
-            </div>
-            <div class="move-card">
-              <div class="move-symbol">▼</div>
-              <h3>Eğil</h3>
-              <p>Dalların altından geç.</p>
-            </div>
-            <div class="move-card">
-              <div class="move-symbol">🪞</div>
-              <h3>Ayna Kapısı</h3>
-              <p>Kol ve bacak pozunu kopyala.</p>
-            </div>
-          </div>
+        <div class="summary-cell">
+          <span>En İyi Seri</span>
+          <strong id="complete-streak">0x</strong>
         </div>
-      </section>
+      </div>
+      <div class="modal-stack">
+        <button id="btn-next-stage" class="btn btn-primary btn-xl" type="button">Sonraki Parkur</button>
+        <button id="btn-complete-home" class="btn btn-secondary" type="button">Ana Menü</button>
+      </div>
+    </div>
+  </section>
 
-      <!-- Duraklatma Ekranı -->
-      <section id="screen-pause" class="screen-overlay hidden">
-        <div class="modal-card modal-small">
-          <h2>Kısa Bir Mola</h2>
-          <p class="modal-desc">Hazır olduğunda parkura kaldığın yerden devam edebilirsin.</p>
-          <div class="modal-actions">
-            <button id="btn-resume" class="btn btn-primary" type="button">Devam Et</button>
-            <button id="btn-pause-settings" class="btn btn-secondary btn-settings-mobile" type="button">⚙ Ayarlar</button>
-            <button id="btn-pause-home" class="btn btn-secondary" type="button">Ana Ekran</button>
-          </div>
+  <!-- 5. TEKRAR DENE EKRANI -->
+  <section id="screen-end" class="full-screen-page modal-backdrop hidden">
+    <div class="mini-modal">
+      <h2>Güzel Bir Koşuydu!</h2>
+      <p>Biraz dinlenip tekrar deneyebilirsin.</p>
+      <div class="summary-grid">
+        <div class="summary-cell">
+          <span>Parkur</span>
+          <strong id="end-stage">1</strong>
         </div>
-      </section>
-
-      <!-- Parkur Tamamlandı Ekranı -->
-      <section id="screen-complete" class="screen-overlay hidden">
-        <div class="modal-card modal-small">
-          <h2>Harikasın! Parkuru Bitirdin</h2>
-          <p id="complete-desc" class="modal-desc">Çok güzel hareket ettin. Bir sonraki parkura geçmeye hazır mısın?</p>
-          <div class="summary-row">
-            <div class="summary-box">
-              <span class="summary-label">Parkur</span>
-              <span id="complete-stage" class="summary-value">1</span>
-            </div>
-            <div class="summary-box">
-              <span class="summary-label">Yıldız</span>
-              <span id="complete-stars" class="summary-value">0</span>
-            </div>
-            <div class="summary-box">
-              <span class="summary-label">En İyi Seri</span>
-              <span id="complete-streak" class="summary-value">0x</span>
-            </div>
-          </div>
-          <div class="modal-actions">
-            <button id="btn-next-stage" class="btn btn-primary" type="button">Sonraki Parkur</button>
-            <button id="btn-complete-home" class="btn btn-secondary" type="button">Ana Ekran</button>
-          </div>
+        <div class="summary-cell">
+          <span>Yıldız</span>
+          <strong id="end-stars">★ 0</strong>
         </div>
-      </section>
+      </div>
+      <div class="modal-stack">
+        <button id="btn-retry" class="btn btn-primary btn-xl" type="button">Tekrar Oyna</button>
+        <button id="btn-end-home" class="btn btn-secondary" type="button">Ana Menü</button>
+      </div>
+    </div>
+  </section>
 
-      <!-- Sakin Tekrar Dene Ekranı -->
-      <section id="screen-end" class="screen-overlay hidden">
-        <div class="modal-card modal-small">
-          <h2>Güzel Bir Koşuydu!</h2>
-          <p class="modal-desc">Biraz dinlenip aynı parkuru tekrar deneyebilirsin.</p>
-          <div class="summary-row">
-            <div class="summary-box">
-              <span class="summary-label">Parkur</span>
-              <span id="end-stage" class="summary-value">1</span>
-            </div>
-            <div class="summary-box">
-              <span class="summary-label">Kazanılan Yıldız</span>
-              <span id="end-stars" class="summary-value">0</span>
-            </div>
-          </div>
-          <div class="modal-actions">
-            <button id="btn-retry" class="btn btn-primary" type="button">Tekrar Oyna</button>
-            <button id="btn-end-home" class="btn btn-secondary" type="button">Ana Ekran</button>
-          </div>
-        </div>
-      </section>
-    </main>
-  </div>
-
-  <script type="module" src="app.js"></script>
+  <script type="module" src="app.js?v=5"></script>
 </body>
 </html>
