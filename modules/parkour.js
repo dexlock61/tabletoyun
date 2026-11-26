@@ -71,8 +71,8 @@ export class ParkourEngine {
     this.clearedCount = 0;
     this.totalObstacles = 12;
 
-    this.feedbackText = '';
-    this.feedbackColor = '#46733f';
+    // Yazısız görsel geri bildirim (sadece sabit onay/yıldız simgesi)
+    this.feedbackIcon = ''; // 'ok' | 'star' | ''
     this.feedbackTimer = 0;
 
     // Canlı kamera poz verisi
@@ -156,7 +156,7 @@ export class ParkourEngine {
     this.distance = 0;
     this.clearedCount = 0;
     this.particles = [];
-    this.feedbackText = '';
+    this.feedbackIcon = '';
     this.feedbackTimer = 0;
     this.jumpTimer = 0;
     this.crouchAmount = 0;
@@ -355,10 +355,9 @@ export class ParkourEngine {
     }
   }
 
-  showFeedback(text, color = '#46733f') {
-    this.feedbackText = text;
-    this.feedbackColor = color;
-    this.feedbackTimer = 1.25;
+  showFeedback(iconType = 'ok') {
+    this.feedbackIcon = iconType;
+    this.feedbackTimer = 0.75;
   }
 
   spawnCelebration(x, y, count = 14) {
@@ -467,7 +466,6 @@ export class ParkourEngine {
         if (this.callbacks.onPrepStateChange) {
           this.callbacks.onPrepStateChange(false);
         }
-        this.showFeedback('Başladık! Koş!', '#46733f');
       }
       return;
     }
@@ -550,8 +548,8 @@ export class ParkourEngine {
             this.stars += 3;
             this.boostTimer = 1.6;
             sfx.playPoseMatch();
-            this.showFeedback(`Süper! +3 Yıldız — ${obs.poseDef.title}!`, '#46733f');
-            this.spawnCelebration(this.viewWidth * 0.5, this.viewHeight * 0.44, 22);
+            this.showFeedback('ok');
+            this.spawnCelebration(this.viewWidth * 0.5, this.viewHeight * 0.44, 24);
             this.notifyHud();
           }
         } else {
@@ -601,17 +599,7 @@ export class ParkourEngine {
             this.bestStreak = Math.max(this.bestStreak, this.streak);
             this.stars += 1;
             sfx.playClear(this.streak);
-
-            let msg =
-              obs.type === 'jump'
-                ? 'Müthiş Zıplama!'
-                : obs.type === 'duck'
-                  ? 'Harika Eğildin!'
-                  : 'Süper Kaçış!';
-            if (this.streak >= 3) {
-              msg = `${msg} (${this.streak}x Seri!)`;
-            }
-            this.showFeedback(msg, '#46733f');
+            this.showFeedback('ok');
             this.spawnCelebration(this.viewWidth * 0.5, this.viewHeight * 0.5, 12);
           }
         } else {
@@ -622,15 +610,6 @@ export class ParkourEngine {
           if (!this.calmMode) {
             this.lives = Math.max(0, this.lives - 1);
           }
-          const gentleHint =
-            obs.type === 'jump'
-              ? 'Hop! Bir dahakine zıplayalım!'
-              : obs.type === 'duck'
-                ? 'Hop! Bir dahakine eğilelim!'
-                : obs.type === 'mirror'
-                  ? 'Bir dahakine pozu yakalayalım!'
-                  : 'Sorun değil, koşmaya devam!';
-          this.showFeedback(gentleHint, '#b35c44');
 
           if (!this.calmMode && this.lives <= 0) {
             this.isRunning = false;
@@ -743,12 +722,8 @@ export class ParkourEngine {
     if (this.isRunning && this.countdownTimer > 0) {
       this.drawPrepCountdown(ctx, w, h);
     } else if (this.isRunning) {
-      this.drawUpcomingCue(ctx, w);
-      this.drawStanceIndicator(ctx, w, h);
-    }
-
-    if (this.feedbackTimer > 0 && this.feedbackText) {
-      this.drawFeedbackToast(ctx, w, h);
+      this.drawFixedActionCue(ctx, w);
+      this.drawLaneDots(ctx, w, h);
     }
   }
 
@@ -1297,27 +1272,6 @@ export class ParkourEngine {
         ctx.fill();
       }
     }
-
-    if (width > 62) {
-      const signCx = (leftBase.x + rightBase.x) * 0.5;
-      const signW = Math.min(132, width * 0.32);
-      const signH = Math.min(34, height * 0.88);
-      const signY = leftTop.y - signH - Math.max(6, height * 0.18);
-
-      ctx.fillStyle = '#faf6ec';
-      ctx.strokeStyle = '#df7f62';
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.roundRect(signCx - signW / 2, signY, signW, signH, 11);
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.fillStyle = '#4a3d33';
-      ctx.font = `800 ${Math.max(11, Math.min(16, signH * 0.54))}px Nunito, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('▲ Zıpla!', signCx, signY + signH / 2 + 1);
-    }
   }
 
   drawDuckObstacle(ctx, obs, relZ) {
@@ -1372,27 +1326,6 @@ export class ParkourEngine {
         ctx.fill();
       }
     }
-
-    if (width > 68) {
-      const cx = (leftBase.x + rightBase.x) * 0.5;
-      const cy = leftTop.y + beamH * 0.54;
-      const pillW = Math.min(126, width * 0.33);
-      const pillH = Math.min(34, beamH * 0.56);
-
-      ctx.fillStyle = '#faf6ec';
-      ctx.strokeStyle = '#5e8855';
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.roundRect(cx - pillW / 2, cy - pillH / 2, pillW, pillH, 11);
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.fillStyle = '#4a3d33';
-      ctx.font = `800 ${Math.max(11, Math.min(16, pillH * 0.55))}px Nunito, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('▼ Eğil!', cx, cy + 1);
-    }
   }
 
   drawMirrorGate(ctx, obs, relZ) {
@@ -1431,9 +1364,9 @@ export class ParkourEngine {
       ctx.stroke();
 
       if (obs.curtainOpen < 0.35 && width > 50) {
-        const silSize = Math.min(innerW * 0.4, panelH * 0.66);
+        const silSize = Math.min(innerW * 0.44, panelH * 0.72);
         const cx = leftBase.x + width / 2;
-        const cy = panelY + panelH * 0.49;
+        const cy = panelY + panelH * 0.5;
 
         drawTargetPoseSilhouette(ctx, obs.poseDef, cx, cy, silSize, obs.matched);
 
@@ -1441,20 +1374,12 @@ export class ParkourEngine {
           drawLiveMirrorOverlay(ctx, this.livePose, this.liveBodyScale, cx, cy, silSize, obs.matched);
         }
 
-        if (obs.poseDef.usesLegs && !this.liveHasLegs && this.livePose && !obs.matched && width > 130) {
-          ctx.fillStyle = '#8c5742';
-          ctx.font = `700 ${Math.max(10, Math.min(13, innerW * 0.045))}px Nunito, sans-serif`;
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText('Biraz geri çekil, ayakların da görünsün!', cx, panelY + panelH - 12);
-        }
-
         if (obs.holdTime > 0 && !obs.matched) {
           const prog = Math.min(1, obs.holdTime / obs.requiredHold);
           const barW = Math.min(150, innerW * 0.52);
           const barH = 12;
           const bx = cx - barW / 2;
-          const by = panelY + panelH - 26;
+          const by = panelY + panelH - 22;
           ctx.fillStyle = '#ddd2c0';
           ctx.beginPath();
           ctx.roundRect(bx, by, barW, barH, 6);
@@ -1482,14 +1407,27 @@ export class ParkourEngine {
     ctx.fill();
     ctx.stroke();
 
-    if (width > 72) {
-      ctx.fillStyle = '#faf7f0';
-      const fontSize = Math.max(11, Math.min(20, headerH * 0.46));
-      ctx.font = `800 ${fontSize}px Nunito, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      const label = obs.matched ? `✓ Harika! (${obs.poseDef.title})` : `🪞 Ayna Kapısı: ${obs.poseDef.title}`;
-      ctx.fillText(label, leftBase.x + width / 2, leftTop.y + headerH / 2 + 1);
+    // Üst kemerde yazı yerine sade yıldız / onay ikonu
+    if (width > 56) {
+      const hx = leftBase.x + width / 2;
+      const hy = leftTop.y + headerH / 2;
+      const iconR = Math.max(6, headerH * 0.3);
+      if (obs.matched) {
+        this.drawCheckIcon(ctx, hx, hy, iconR, '#faf7f0');
+      } else {
+        ctx.fillStyle = '#f5d27b';
+        ctx.beginPath();
+        for (let i = 0; i < 10; i++) {
+          const rad = i % 2 === 0 ? iconR : iconR * 0.48;
+          const a = (i * Math.PI) / 5 - Math.PI / 2;
+          const sx = hx + Math.cos(a) * rad;
+          const sy = hy + Math.sin(a) * rad;
+          if (i === 0) ctx.moveTo(sx, sy);
+          else ctx.lineTo(sx, sy);
+        }
+        ctx.closePath();
+        ctx.fill();
+      }
     }
   }
 
@@ -1506,22 +1444,28 @@ export class ParkourEngine {
     ctx.fillRect(leftBase.x, leftTop.y, postW, height);
     ctx.fillRect(rightBase.x - postW, leftTop.y, postW, height);
 
-    const bannerH = height * 0.24;
-    ctx.fillStyle = '#5e8e56';
+    // Yazısız damalı bitiş kemeri!
+    const bannerH = height * 0.22;
+    const cols = 8;
+    const rows = 2;
+    const cellW = width / cols;
+    const cellH = bannerH / rows;
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(leftBase.x, leftTop.y, width, bannerH, 10);
+    ctx.clip();
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        ctx.fillStyle = (r + c) % 2 === 0 ? '#5e8e56' : '#faf6ec';
+        ctx.fillRect(leftBase.x + c * cellW, leftTop.y + r * cellH, cellW + 0.5, cellH + 0.5);
+      }
+    }
+    ctx.restore();
     ctx.strokeStyle = '#3f6939';
     ctx.lineWidth = 2.5;
     ctx.beginPath();
-    ctx.roundRect(leftBase.x, leftTop.y, width, bannerH, 12);
-    ctx.fill();
+    ctx.roundRect(leftBase.x, leftTop.y, width, bannerH, 10);
     ctx.stroke();
-
-    if (width > 70) {
-      ctx.fillStyle = '#faf7f0';
-      ctx.font = `800 ${Math.max(12, Math.min(24, bannerH * 0.48))}px Nunito, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('🏁 Bitiş Kapısı!', leftBase.x + width / 2, leftTop.y + bannerH / 2 + 1);
-    }
   }
 
   drawGentleWindLines(ctx, w, h) {
@@ -1621,152 +1565,132 @@ export class ParkourEngine {
     ctx.restore();
   }
 
-  drawUpcomingCue(ctx, w) {
+  drawArrowIcon(ctx, cx, cy, dir, r, color) {
+    ctx.save();
+    ctx.translate(cx, cy);
+    const rotMap = { right: 0, down: Math.PI / 2, left: Math.PI, up: -Math.PI / 2 };
+    ctx.rotate(rotMap[dir] || 0);
+
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    // Kalın, yumuşak köşeli net yön oku (sağa bakan temel şekil)
+    ctx.moveTo(r * 0.92, 0);
+    ctx.lineTo(r * 0.06, -r * 0.78);
+    ctx.lineTo(r * 0.06, -r * 0.34);
+    ctx.lineTo(-r * 0.86, -r * 0.34);
+    ctx.lineTo(-r * 0.86, r * 0.34);
+    ctx.lineTo(r * 0.06, r * 0.34);
+    ctx.lineTo(r * 0.06, r * 0.78);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  drawCheckIcon(ctx, cx, cy, r, color) {
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = Math.max(4, r * 0.34);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(cx - r * 0.62, cy + r * 0.04);
+    ctx.lineTo(cx - r * 0.14, cy + r * 0.54);
+    ctx.lineTo(cx + r * 0.7, cy - r * 0.52);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /**
+   * Yazısız, ekranda TAM SABİT (sağa sola kaymayan) büyük yön oku göstergesi
+   */
+  drawFixedActionCue(ctx, w) {
     const upcoming = this.obstacles.find((o) => !o.resolved && o.z - this.distance > 1.0 && o.z - this.distance < 21);
-    if (!upcoming) return;
 
-    let label = '';
+    let iconType = null; // 'up' | 'down' | 'left' | 'right' | 'check'
+    let color = '#5e8e56';
     let bg = 'rgba(250, 247, 240, 0.94)';
-    let border = '#c9bca8';
 
-    if (upcoming.type === 'jump') {
-      label = '▲ Zıpla!';
-      border = '#df7f62';
-    } else if (upcoming.type === 'duck') {
-      label = '▼ Eğil!';
-      border = '#5e8e56';
-    } else if (upcoming.type === 'dodge') {
-      if (upcoming.openLane === -1) label = '◀ Sola Kaç!';
-      else if (upcoming.openLane === 1) label = 'Sağa Kaç! ▶';
-      else label = '● Ortaya Geç!';
-      border = '#d4a13f';
-    } else if (upcoming.type === 'mirror') {
-      label = upcoming.matched
-        ? `✓ Kapı Açıldı! (${upcoming.poseDef.title})`
-        : `🪞 ${upcoming.poseDef.title} — ${upcoming.poseDef.subtitle}`;
-      bg = upcoming.matched ? 'rgba(215, 236, 208, 0.95)' : 'rgba(252, 245, 234, 0.96)';
-      border = upcoming.matched ? '#5e8e56' : '#df7f62';
-    } else if (upcoming.type === 'finish') {
-      label = '🏁 Bitiş Kapısı Göründü!';
-      border = '#5e8e56';
-    }
-
-    if (!label) return;
-
-    ctx.save();
-    const isNarrow = w < 640;
-    ctx.font = `800 ${isNarrow ? 15 : 18}px Nunito, sans-serif`;
-    const textW = ctx.measureText(label).width;
-    const pillW = Math.min(w - 24, textW + (isNarrow ? 30 : 42));
-    const pillH = isNarrow ? 36 : 42;
-    const px = (w - pillW) / 2;
-    const py = 60;
-
-    ctx.fillStyle = bg;
-    ctx.strokeStyle = border;
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.roundRect(px, py, pillW, pillH, 21);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.fillStyle = '#3d3730';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(label, w / 2, py + pillH / 2 + 1);
-    ctx.restore();
-  }
-
-  drawStanceIndicator(ctx, w, h) {
-    const barW = Math.min(264, w - 24);
-    const barH = 38;
-    const bx = (w - barW) / 2;
-    const by = h - barH - 14;
-
-    ctx.save();
-    ctx.fillStyle = 'rgba(250, 247, 240, 0.9)';
-    ctx.strokeStyle = '#d4cab9';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.roundRect(bx, by, barW, barH, 19);
-    ctx.fill();
-    ctx.stroke();
-
-    const labels = [
-      { lane: -1, text: 'Sol' },
-      { lane: 0, text: 'Orta' },
-      { lane: 1, text: 'Sağ' }
-    ];
-
-    const segW = barW / 3;
-    labels.forEach((item, idx) => {
-      const sx = bx + idx * segW;
-      const active = this.playerLane === item.lane;
-      if (active) {
-        ctx.fillStyle = '#5e8e56';
-        ctx.beginPath();
-        ctx.roundRect(sx + 4, by + 4, segW - 8, barH - 8, 14);
-        ctx.fill();
+    if (upcoming) {
+      if (upcoming.type === 'jump') {
+        iconType = 'up';
+        color = '#df7f62';
+      } else if (upcoming.type === 'duck') {
+        iconType = 'down';
+        color = '#5e8e56';
+      } else if (upcoming.type === 'dodge') {
+        if (!upcoming.blockedLanes.includes(this.playerLane)) {
+          // Çocuk zaten açık şeritteyse yeşil onay!
+          iconType = 'check';
+          color = '#5e8e56';
+          bg = 'rgba(222, 239, 217, 0.95)';
+        } else if (upcoming.openLane < this.playerLane) {
+          iconType = 'left';
+          color = '#d4962e';
+        } else {
+          iconType = 'right';
+          color = '#d4962e';
+        }
+      } else if (upcoming.type === 'mirror' && upcoming.matched) {
+        iconType = 'check';
+        color = '#5e8e56';
+        bg = 'rgba(222, 239, 217, 0.95)';
       }
-      ctx.fillStyle = active ? '#faf7f0' : '#6c6358';
-      ctx.font = '800 13px Nunito, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(item.text, sx + segW / 2, by + barH / 2 + 1);
-    });
-
-    let stanceText = 'Koşuyor';
-    let stanceBg = '#ece3d3';
-    if (this.jumpTimer > 0) {
-      stanceText = '▲ Havada!';
-      stanceBg = '#d5e8ce';
-    } else if (this.crouchAmount > 0.42) {
-      stanceText = '▼ Eğildi!';
-      stanceBg = '#f0decb';
+    } else if (this.feedbackTimer > 0 && this.feedbackIcon === 'ok') {
+      iconType = 'check';
+      color = '#5e8e56';
+      bg = 'rgba(222, 239, 217, 0.95)';
     }
 
-    const badgeW = 92;
-    const badgeX = bx + barW + 10;
-    if (badgeX + badgeW < w - 12) {
-      ctx.fillStyle = stanceBg;
-      ctx.strokeStyle = '#cfc5b4';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.roundRect(badgeX, by + 4, badgeW, barH - 8, 14);
-      ctx.fill();
-      ctx.stroke();
+    if (!iconType) return;
 
-      ctx.fillStyle = '#4a4138';
-      ctx.font = '800 12.5px Nunito, sans-serif';
-      ctx.fillText(stanceText, badgeX + badgeW / 2, by + barH / 2 + 1);
-    }
+    // Tam sabit orta-üst konum (hiç kaymaz!)
+    const size = w < 640 ? 64 : 78;
+    const cx = w * 0.5;
+    const cy = 64 + size * 0.5;
 
-    ctx.restore();
-  }
-
-  drawFeedbackToast(ctx, w, h) {
-    const alpha = Math.min(1, this.feedbackTimer * 1.5);
     ctx.save();
-    ctx.globalAlpha = alpha;
-    ctx.font = '800 20px Nunito, sans-serif';
-    const textW = ctx.measureText(this.feedbackText).width;
-    const boxW = Math.min(w - 28, textW + 40);
-    const boxH = 42;
-    const x = (w - boxW) / 2;
-    const y = h * 0.26;
-
-    ctx.fillStyle = 'rgba(250, 247, 240, 0.96)';
-    ctx.strokeStyle = this.feedbackColor;
-    ctx.lineWidth = 2.5;
+    ctx.fillStyle = bg;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 3.5;
     ctx.beginPath();
-    ctx.roundRect(x, y, boxW, boxH, 15);
+    ctx.roundRect(cx - size / 2, cy - size / 2, size, size, 20);
     ctx.fill();
     ctx.stroke();
 
-    ctx.fillStyle = this.feedbackColor;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(this.feedbackText, w / 2, y + boxH / 2 + 1);
+    const iconR = size * 0.34;
+    if (iconType === 'check') {
+      this.drawCheckIcon(ctx, cx, cy, iconR, color);
+    } else {
+      this.drawArrowIcon(ctx, cx, cy, iconType, iconR, color);
+    }
+    ctx.restore();
+  }
+
+  /**
+   * Altta yazısız, sade 3 şerit noktası (Sol / Orta / Sağ)
+   */
+  drawLaneDots(ctx, w, h) {
+    const cx = w * 0.5;
+    const cy = h - 24;
+    const spacing = 26;
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(250, 247, 240, 0.85)';
+    ctx.strokeStyle = '#d4cab9';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.roundRect(cx - 50, cy - 13, 100, 26, 13);
+    ctx.fill();
+    ctx.stroke();
+
+    [-1, 0, 1].forEach((lane) => {
+      const dx = cx + lane * spacing;
+      const active = this.playerLane === lane;
+      ctx.fillStyle = active ? '#5e8e56' : '#cfc5b4';
+      ctx.beginPath();
+      ctx.arc(dx, cy, active ? 7.5 : 5, 0, Math.PI * 2);
+      ctx.fill();
+    });
     ctx.restore();
   }
 }

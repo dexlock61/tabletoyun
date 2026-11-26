@@ -216,7 +216,7 @@ class ParkourApp {
 
     this.btnRecalibrate.addEventListener('click', () => {
       this.tracker.recalibrate();
-      this.engine.showFeedback('Boy hizalaması yenilendi', '#46733f');
+      this.engine.showFeedback('ok');
     });
 
     this.btnMute.addEventListener('click', () => {
